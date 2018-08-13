@@ -1,0 +1,7 @@
+.idea
+.cproject
+.project
+.settings/
+
+MarketCrawl/*.pyc
+MarketCrawl/spiders/*.pyc
