@@ -42,6 +42,7 @@ class BasicIndicatorItem(Item):
     # 数据更新时间
     last_update_time = Field()
 
+
 class MainInfluxItem(Item):
     # 股票代码
     symbol = Field()
@@ -69,6 +70,7 @@ class MainInfluxItem(Item):
     small_influx_ratio = Field()
     # 数据更新时间
     last_update_time = Field()
+
 
 class FinancialNoticeItem(Item):
     # 股票代码

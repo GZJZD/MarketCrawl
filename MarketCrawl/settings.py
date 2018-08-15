@@ -49,7 +49,7 @@ FEED_EXPORT_ENCODING = 'utf-8'
 # Configure a delay for requests for the same website (default: 0)
 # See http://scrapy.readthedocs.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-DOWNLOAD_DELAY = 0.2
+
 # The download delay setting will honor only one of:
 #CONCURRENT_REQUESTS_PER_DOMAIN = 16
 #CONCURRENT_REQUESTS_PER_IP = 16
@@ -91,16 +91,16 @@ DOWNLOAD_DELAY = 0.2
 #}
 ITEM_PIPELINES = {
     'MarketCrawl.pipelines.MarketCrawlJsonPipeline': 300, #保存到文件
-    'MarketCrawl.pipelines.MarketCrawlSQLPipeline': 300, #保存到mysql数据库
+    'MarketCrawl.pipelines.MarketCrawlSQLPipeline': 300,  #保存到mysql数据库
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See http://doc.scrapy.org/en/latest/topics/autothrottle.html
 #AUTOTHROTTLE_ENABLED = True
 # The initial download delay
-#AUTOTHROTTLE_START_DELAY = 5
+#AUTOTHROTTLE_START_DELAY = 30
 # The maximum download delay to be set in case of high latencies
-#AUTOTHROTTLE_MAX_DELAY = 60
+#AUTOTHROTTLE_MAX_DELAY = 90
 # The average number of requests Scrapy should be sending in parallel to
 # each remote server
 #AUTOTHROTTLE_TARGET_CONCURRENCY = 1.0

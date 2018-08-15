@@ -2,8 +2,8 @@
 from scrapy import cmdline
 import sys
 
-name = 'GridListSpider'
-#name = 'MainInfluxSpider'
+#name = 'GridListSpider'
+name = 'MainInfluxSpider'
 #name = 'FinancialNoticeSpider'
 #name = 'ShareHolderSpider'
 #name = 'ShareBuybackSpider'

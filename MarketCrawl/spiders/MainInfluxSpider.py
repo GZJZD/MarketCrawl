@@ -9,17 +9,6 @@
 @file: MainInfluxSpider.py
 @time: 2018/8/10 14:52
 @desc: 主力流入爬虫
-
-@页面地址: http://data.eastmoney.com/zjlx/000063.html
-@JSP请求: http://ff.eastmoney.com//EM_CapitalFlowInterface/api/js
-?type=hff
-&cb=var%20aff_data=
-&rtntype=2
-&js={data:(x)}
-&check=TMLBMSPROCR
-&acces_token=1942f5da9b46b069953c873404aad4b5
-&id=0000632
-&_=1534217118028
 @format: aff_data={data: [..., ...]}
 '''
 
@@ -30,18 +19,25 @@ from scrapy import signals
 from collections import OrderedDict
 from MarketCrawl.logger import logger
 from MarketCrawl.items import *
+from pymysql.connections import Connection
+from pymysql.cursors import Cursor
+import pymysql
 import time
 import demjson
 import re
 import random
 import string
-import pymysql
+
 
 class MainInfluxSpider(Spider):
-
     name = 'MainInfluxSpider'
-    allowed_domains = ['data.eastmoney.com', 'nufm.dfcfw.com']
+    allowed_domains = ['ff.eastmoney.com', ]
     start_urls = ['http://ff.eastmoney.com//EM_CapitalFlowInterface/api/js']
+    custom_settings = {
+        'DOWNLOAD_DELAY': 0.2,
+        'RETRY_TIMES': 5,
+        'DOWNLOAD_TIMEOUT': 60
+    }
 
     db_connect = None
     share_codes = []
@@ -53,7 +49,7 @@ class MainInfluxSpider(Spider):
     def from_crawler(cls, crawler):
         # This method is used by Scrapy to create your spiders.
         # 连接数据库
-        db = pymysql.Connect(
+        db = pymysql.connect(
             host=crawler.settings["DATABASE_CONNECTION"]['MYSQL_HOST'],
             port=crawler.settings["DATABASE_CONNECTION"]['MYSQL_PORT'],
             user=crawler.settings["DATABASE_CONNECTION"]['MYSQL_USER'],
@@ -66,6 +62,7 @@ class MainInfluxSpider(Spider):
         s = cls(db)
         crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
         crawler.signals.connect(s.spider_closed, signal=signals.spider_closed)
+        s.set_crawler(crawler)
 
         return s
 
@@ -74,12 +71,14 @@ class MainInfluxSpider(Spider):
         logger.info('###############################%s Start###################################', spider.name)
 
         if self.db_connect is not None:
+            assert isinstance(self.db_connect, Connection)
             cursor = self.db_connect.cursor()
 
             sql = """SELECT shares_code, shares_type, shares_name FROM crawler_basic_index 
-            GROUP BY shares_code ORDER BY shares_code ASC"""
+            WHERE shares_type IS NOT NULL GROUP BY shares_code ORDER BY shares_code ASC"""
 
             # 同步执行sql查询指令
+            assert isinstance(cursor, Cursor)
             cursor.execute(sql)
             self.db_connect.commit()
 
@@ -97,7 +96,12 @@ class MainInfluxSpider(Spider):
         else:
             raise RuntimeError('db_pool is None')
 
+        print spider.crawler.stats
+
     def spider_closed(self, spider):
+        assert isinstance(self.db_connect, Connection)
+        self.db_connect.close()
+
         assert isinstance(spider, Spider)
         logger.info('###############################%s End#####################################', spider.name)
 
@@ -121,18 +125,16 @@ class MainInfluxSpider(Spider):
         param_list = OrderedDict()
 
         # 初始赋值
-        param_list['type'] = 'ct'
-        param_list['st'] = '(BalFlowMain)'
-        param_list['sr'] = -1
-        param_list['p'] = 1
-        param_list['ps'] = 300
-        param_list['js'] = 'var%20{}='.format(self.generate_random_prefix()) \
-                           + '{pages:(pc),date:%222014-10-22%22,data:[(x)]}'
+        param_list['type'] = 'hff'
+        param_list['rtntype'] = 2
+        param_list['js'] = '{data:[(x)]}'
+        param_list['cb'] = 'var%20aff_data='
+        param_list['check'] = 'TMLBMSPROCR'
+        param_list['acces_token'] = '1942f5da9b46b069953c873404aad4b5'
 
-        param_list['token'] = '894050c76af8597a853f5b408b759f5d'
-        param_list['cmd'] = 'C._AB'
-        param_list['sty'] = 'DCFFITA'
-        param_list['rt'] = self.current_milli_time()
+        begin_index = 0
+        param_list['id'] = self.share_codes[begin_index]['code'] + self.share_codes[begin_index]['type']
+        param_list['_'] = self.current_milli_time()
 
         # 组织查询参数
         query_param = ''
@@ -147,58 +149,59 @@ class MainInfluxSpider(Spider):
 
         yield Request(
             url=begin_url,
-            meta={'page_no': param_list['p'], 'page_size': param_list['ps']}
+            meta={'page_index': begin_index, 'page_total': len(self.share_codes)}
         )
 
     def parse(self, response):
         assert isinstance(response, Response)
+
+        page_total = response.meta['page_total']
+        page_index = response.meta['page_index']
+        logger.info('page_total=%s, page_index=%s, share_code=%s, share_name=%s',page_total, page_index,
+                    self.share_codes[page_index]['code'], self.share_codes[page_index]['name'])
+
         # 去除头部的'=', 得到json格式的文本
-        body_list = re.split('^[^=]*(?=)=', str(response.body))
-        json_text = body_list[1]
+        body_list = re.split('^[^=]*(=+)', str(response.body))
+        json_text = body_list[2]
 
+        # 解析pagedata的JSON数据体，构造并填充item对象后返回
         json_obj = demjson.decode(json_text)
-        assert isinstance(json_obj, dict)
+        if 'data' in json_obj and len(json_obj['data']) > 0:
+            page_data = json_obj['data'][0]
 
-        page_data = json_obj['data']
-        assert isinstance(page_data, list)
-        for unit_text in page_data:
-            assert isinstance(unit_text, unicode)
-            unit = unit_text.split(u',')
+            for unit_text in page_data:
+                assert isinstance(unit_text, unicode)
+                unit = unit_text.split(u',')
 
-            item = MainInfluxItem()
-            item['symbol'] = unit[1]
-            item['name'] = unit[2]
+                item = MainInfluxItem()
+                item['symbol'] = self.share_codes[page_index]['code']
+                item['name'] = self.share_codes[page_index]['name']
+                item['last_update_time'] = unit[0]
+                item['main_influx_price'] = unit[1]
+                item['main_influx_ratio'] = unit[2]
+                item['huge_influx_price'] = unit[3]
+                item['huge_influx_ratio'] = unit[4]
+                item['large_influx_price'] = unit[5]
+                item['large_influx_ratio'] = unit[6]
+                item['middle_influx_price'] = unit[7]
+                item['middle_influx_ratio'] = unit[8]
+                item['small_influx_price'] = unit[9]
+                item['small_influx_ratio'] = unit[10]
 
-            item['main_influx_price'] = unit[5]
-            item['main_influx_ratio'] = unit[6]
+                yield item
+        else:
+            logger.info('page_data data is empty')
 
-            item['huge_influx_price'] = unit[7]
-            item['huge_influx_ratio'] = unit[8]
-
-            item['large_influx_price'] = unit[9]
-            item['large_influx_ratio'] = unit[10]
-
-            item['middle_influx_price'] = unit[11]
-            item['middle_influx_ratio'] = unit[12]
-
-            item['small_influx_price'] = unit[13]
-            item['small_influx_ratio'] = unit[14]
-
-            item['last_update_time'] = unit[15]
-
-            yield item
-
-        page_total = json_obj['pages']
-        page_size = response.meta['page_size']
-        page_no = response.meta['page_no']
-        logger.info('page_total=%s, page_no=%s, page_size=%s', page_total, page_no, page_size)
-
-        if page_no < page_total:
-            page_no += 1
-            next_url = re.sub('p=\d+', 'p={}'.format(page_no), response.url)
+        # 更新下一个待爬取的url后返回
+        if page_index < page_total:
+            # 更新下一支股票由code+type组成的key
+            page_index += 1
+            next_share_key = self.share_codes[page_index]['code'] + self.share_codes[page_index]['type']
+            next_url = re.sub('id=\w+', 'id={}'.format(next_share_key), response.url)
             yield Request(
                 url=next_url,
-                meta={'page_no': page_no, 'page_size': page_size}
+                meta={'page_index': page_index, 'page_total': page_total}
             )
-
             logger.info('next_url=%s', next_url)
+        else:
+            logger.info('{} is finished'.format(self.name))
