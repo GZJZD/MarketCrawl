@@ -9,6 +9,8 @@ class BasicIndicatorItem(Item):
     symbol = Field()
     # 股票名称
     name = Field()
+    # 股票所在交易所类型
+    type = Field()
     # 最新价
     last_price = Field()
     # 涨跌额

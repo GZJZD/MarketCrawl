@@ -1,9 +1,32 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# encoding: utf-8
+
+'''
+@author: panhongfa
+@license: (C) Copyright 2017-2020, Node Supply Chain Manager Corporation Limited.
+@contact: panhongfas@163.com
+@software: PyCharm
+@file: MainInfluxSpider.py
+@time: 2018/8/10 14:52
+@desc: 主力流入爬虫
+
+@页面地址: http://data.eastmoney.com/zjlx/000063.html
+@JSP请求: http://ff.eastmoney.com//EM_CapitalFlowInterface/api/js
+?type=hff
+&cb=var%20aff_data=
+&rtntype=2
+&js={data:(x)}
+&check=TMLBMSPROCR
+&acces_token=1942f5da9b46b069953c873404aad4b5
+&id=0000632
+&_=1534217118028
+@format: aff_data={data: [..., ...]}
+'''
+
 from scrapy.spiders import Spider
 from scrapy.http import Request
 from scrapy.http import Response
 from scrapy import signals
-from scrapy.loader import ItemLoader
 from collections import OrderedDict
 from MarketCrawl.logger import logger
 from MarketCrawl.items import *
@@ -12,23 +35,67 @@ import demjson
 import re
 import random
 import string
+import pymysql
 
 class MainInfluxSpider(Spider):
+
     name = 'MainInfluxSpider'
-    allowed_domains = ['quote.eastmoney.com', 'nufm.dfcfw.com']
-    start_urls = ['http://nufm.dfcfw.com/EM_Finance2014NumericApplication/JS.aspx']
+    allowed_domains = ['data.eastmoney.com', 'nufm.dfcfw.com']
+    start_urls = ['http://ff.eastmoney.com//EM_CapitalFlowInterface/api/js']
+
+    db_connect = None
+    share_codes = []
+
+    def __init__(self, db):
+        self.db_connect = db
 
     @classmethod
     def from_crawler(cls, crawler):
         # This method is used by Scrapy to create your spiders.
-        s = cls()
+        # 连接数据库
+        db = pymysql.Connect(
+            host=crawler.settings["DATABASE_CONNECTION"]['MYSQL_HOST'],
+            port=crawler.settings["DATABASE_CONNECTION"]['MYSQL_PORT'],
+            user=crawler.settings["DATABASE_CONNECTION"]['MYSQL_USER'],
+            passwd=crawler.settings["DATABASE_CONNECTION"]['MYSQL_PASSWORD'],
+            db=crawler.settings["DATABASE_CONNECTION"]['MYSQL_DATABASE'],
+            use_unicode=True,
+            charset="utf8",
+        )
+
+        s = cls(db)
         crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
         crawler.signals.connect(s.spider_closed, signal=signals.spider_closed)
+
         return s
 
     def spider_opened(self, spider):
         assert isinstance(spider, Spider)
         logger.info('###############################%s Start###################################', spider.name)
+
+        if self.db_connect is not None:
+            cursor = self.db_connect.cursor()
+
+            sql = """SELECT shares_code, shares_type, shares_name FROM crawler_basic_index 
+            GROUP BY shares_code ORDER BY shares_code ASC"""
+
+            # 同步执行sql查询指令
+            cursor.execute(sql)
+            self.db_connect.commit()
+
+            # 获取查询结果集
+            result = cursor.fetchall()
+            for feild in result:
+                assert isinstance(feild, tuple)
+                share = {
+                    'code': feild[0],
+                    'type': feild[1],
+                    'name': feild[2],
+                }
+                self.share_codes.append(share)
+
+        else:
+            raise RuntimeError('db_pool is None')
 
     def spider_closed(self, spider):
         assert isinstance(spider, Spider)
@@ -47,6 +114,9 @@ class MainInfluxSpider(Spider):
         return milli_time()
 
     def start_requests(self):
+        if len(self.share_codes) == 0:
+            raise RuntimeError('share_codes is empty')
+
         # 默认的dict无序，遍历时不能保证安装插入顺序获取
         param_list = OrderedDict()
 

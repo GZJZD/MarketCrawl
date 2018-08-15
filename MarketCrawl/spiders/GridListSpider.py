@@ -1,4 +1,17 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# encoding: utf-8
+
+'''
+@author: panhongfa
+@license: (C) Copyright 2017-2020, Node Supply Chain Manager Corporation Limited.
+@contact: panhongfas@163.com
+@software: PyCharm
+@file: GridListSpider.py
+@time: 2018/8/10 14:50
+@desc: 基本指标爬虫
+@format: jQuery({data: [..., ...], recordsFiltered: num})
+'''
+
 from scrapy.spiders import Spider
 from scrapy.http import Request
 from scrapy.http import Response
@@ -74,11 +87,14 @@ class GridListSpider(Spider):
     def parse(self, response):
         assert isinstance(response, Response)
         # 去除头尾的'()', 得到json格式的文本
-        json_text = str(response.body).split('(')[1].split(')')[0]
+        body_list = re.split('[()]', str(response.body))
 
+        # 正则分割得到的list结构为['jQuery', {data: [..., ...], recordsFiltered: num}, '']
+        json_text = body_list[1]
+
+        # 解析JSON串
         json_obj = demjson.decode(json_text)
         assert isinstance(json_obj, dict)
-
         page_data = json_obj['data']
 
         assert isinstance(page_data, list)
@@ -87,6 +103,7 @@ class GridListSpider(Spider):
             unit = unit_text.split(u',')
 
             l = ItemLoader(item=BasicIndicatorItem())
+            l.add_value('type', unit[0])
             l.add_value('symbol', unit[1])
             l.add_value('name', unit[2])
             l.add_value('last_price', unit[3])

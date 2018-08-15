@@ -51,6 +51,7 @@ class MarketCrawlSQLPipeline(object):
             use_unicode=True,
             charset="utf8",
         )
+
         pool = adbapi.ConnectionPool("pymysql", **db_parms)
         return cls(pool)
 
@@ -58,7 +59,7 @@ class MarketCrawlSQLPipeline(object):
         pass
 
     def close_spider(self, spider):
-        pass
+        self.db_pool.close()
 
     def process_item(self, item, spider):
         assert isinstance(spider, Spider)
@@ -92,10 +93,10 @@ class MarketCrawlSQLPipeline(object):
     def handle_insert_grid_list(self, cursor, item):
         # 待执行的SQL语句
         sql = """INSERT INTO crawler_basic_index (
-        shares_code, shares_name, latest_price, rise_fall_ratio, rise_fall_price, 
+        shares_code, shares_name, shares_type, latest_price, rise_fall_ratio, rise_fall_price, 
         volumn, price, max_price, min_pirce, open_price, close_price, change_volumn, quantity_ratio, 
         pe_ratio, pb_ratio, date) 
-	    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+	    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) 
 	    ON DUPLICATE KEY UPDATE shares_code=%s, date=%s"""
 
         #从ITEM中获取SQL的数据项并定义为tupe类型
@@ -104,6 +105,7 @@ class MarketCrawlSQLPipeline(object):
         params = []
         params.append(item['symbol'])
         params.append(item['name'])
+        params.append(item['type'])
         params.append(item['last_price'])
         params.append(item['change_rate'])
         params.append(item['change_amount'])

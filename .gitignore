@@ -5,3 +5,9 @@
 
 MarketCrawl/*.pyc
 MarketCrawl/spiders/*.pyc
+MarketCrawl/__pycache__/*.pyc
+
+MarketCrawl/*.json
+MarketCrawl/*.log
+MarketCrawl/*.log.*
+*.txt
