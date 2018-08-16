@@ -95,8 +95,6 @@ class FinancialNoticeItem(Item):
     preview_type = Field()
     # 上年同期净利润
     previous_year_profit = Field()
-    # 所属品种
-    hymc = Field()
     # 公告日期
     announcement_date = Field()
 

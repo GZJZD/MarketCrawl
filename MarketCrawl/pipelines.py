@@ -185,12 +185,10 @@ class MarketCrawlSQLPipeline(object):
         params.append(item['change_reason'])
         params.append(item['preview_type'])
         params.append(item['previous_year_profit'])
-
-        data_and_hours = item['announcement_date'].split(u'T')
-        params.append(data_and_hours[0])
+        params.append(item['announcement_date'])
 
         params.append(item['symbol'])
-        params.append(data_and_hours[0])
+        params.append(item['announcement_date'])
 
         cursor.execute(sql, params)
 

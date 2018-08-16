@@ -1,12 +1,27 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# encoding: utf-8
+
+'''
+@author: panhongfa
+@license: (C) Copyright 2017-2020, Node Supply Chain Manager Corporation Limited.
+@contact: panhongfas@163.com
+@software: PyCharm
+@file: MainInfluxSpider.py
+@time: 2018/8/10 14:52
+@desc: 财报披露爬虫
+@format: html
+'''
+
 from scrapy.spiders import Spider
 from scrapy.http import Request
 from scrapy.http import Response
 from scrapy import signals
-from scrapy.loader import ItemLoader
-from collections import OrderedDict
+from scrapy.selector import Selector
 from MarketCrawl.logger import logger
 from MarketCrawl.items import *
+from pymysql.connections import Connection
+from pymysql.cursors import Cursor
+import pymysql
 import time
 import demjson
 import re
@@ -15,22 +30,75 @@ import string
 
 class FinancialNoticeSpider(Spider):
     name = 'FinancialNoticeSpider'
-    allowed_domains = ['quote.eastmoney.com', 'nufm.dfcfw.com', 'dcfm.eastmoney.com']
-    start_urls = ['http://dcfm.eastmoney.com//em_mutisvcexpandinterface/api/js/get']
+    allowed_domains = ['data.eastmoney.com', ]
+    start_urls = ['http://data.eastmoney.com/bbsj/']
+    custom_settings = {
+        'DOWNLOAD_DELAY': 0.2,
+        'RETRY_TIMES': 5,
+        'DOWNLOAD_TIMEOUT': 60
+    }
+
+    db_connect = None
+    share_codes = []
+
+    def __init__(self, db):
+        self.db_connect = db
 
     @classmethod
     def from_crawler(cls, crawler):
         # This method is used by Scrapy to create your spiders.
-        s = cls()
+        # 连接数据库
+        db = pymysql.connect(
+            host=crawler.settings["DATABASE_CONNECTION"]['MYSQL_HOST'],
+            port=crawler.settings["DATABASE_CONNECTION"]['MYSQL_PORT'],
+            user=crawler.settings["DATABASE_CONNECTION"]['MYSQL_USER'],
+            passwd=crawler.settings["DATABASE_CONNECTION"]['MYSQL_PASSWORD'],
+            db=crawler.settings["DATABASE_CONNECTION"]['MYSQL_DATABASE'],
+            use_unicode=True,
+            charset="utf8",
+        )
+
+        s = cls(db)
         crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
         crawler.signals.connect(s.spider_closed, signal=signals.spider_closed)
+        s.set_crawler(crawler)
+
         return s
 
     def spider_opened(self, spider):
         assert isinstance(spider, Spider)
         logger.info('###############################%s Start###################################', spider.name)
 
+        if self.db_connect is not None:
+            assert isinstance(self.db_connect, Connection)
+            cursor = self.db_connect.cursor()
+
+            sql = """SELECT shares_code, shares_type, shares_name FROM crawler_basic_index 
+            WHERE shares_type IS NOT NULL GROUP BY shares_code ORDER BY shares_code ASC"""
+
+            # 同步执行sql查询指令
+            assert isinstance(cursor, Cursor)
+            cursor.execute(sql)
+            self.db_connect.commit()
+
+            # 获取查询结果集
+            result = cursor.fetchall()
+            for feild in result:
+                assert isinstance(feild, tuple)
+                share = {
+                    'code': feild[0],
+                    'type': feild[1],
+                    'name': feild[2],
+                }
+                self.share_codes.append(share)
+
+        else:
+            raise RuntimeError('db_pool is None')
+
     def spider_closed(self, spider):
+        assert isinstance(self.db_connect, Connection)
+        self.db_connect.close()
+
         assert isinstance(spider, Spider)
         logger.info('###############################%s End#####################################', spider.name)
 
@@ -47,83 +115,98 @@ class FinancialNoticeSpider(Spider):
         return milli_time()
 
     def start_requests(self):
-        # 默认的dict无序，遍历时不能保证安装插入顺序获取
-        param_list = OrderedDict()
-
-        # 初始赋值
-        param_list['type'] = 'YJBB20_YJYG'
-        param_list['token'] = '70f12f2f4f091e459a279469fe49eca5'
-        param_list['st'] = 'ndate'
-        param_list['sr'] = -1
-        param_list['p'] = 1
-        param_list['ps'] = 300
-        param_list['js'] = 'var%20{}='.format(self.generate_random_prefix()) \
-                           + '{pages:(tp),data:%20(x)}'
-
-        param_list['filter'] = '(IsLatest=%27T%27)(enddate=^2018-06-30^)'
-        param_list['rt'] = self.current_milli_time()
+        if len(self.share_codes) == 0:
+            raise RuntimeError('share_codes is empty')
 
         # 组织查询参数
-        query_param = ''
-        for kv in param_list.items():
-            if kv[0] is 'type':
-                query_param += '?{0}={1}'.format(*kv)
-            else:
-                query_param += '&{0}={1}'.format(*kv)
+        begin_index = 0
+        query_param = self.share_codes[begin_index]['code']
+        query_param += '.html'
 
         begin_url = self.start_urls[0] + query_param
         logger.info('begin_url=%s', begin_url)
 
         yield Request(
             url=begin_url,
-            meta={'page_no': param_list['p'], 'page_size': param_list['ps']}
+            meta={'page_index': begin_index, 'page_total': len(self.share_codes)}
         )
 
     def parse(self, response):
         assert isinstance(response, Response)
-        # 去除头部的'=', 得到json格式的文本
-        body_list = re.split('^[^=]*(?=)=', str(response.body))
-        json_text = body_list[1]
+        page_total = response.meta['page_total']
+        page_index = response.meta['page_index']
+        logger.info('page_total=%s, page_index=%s, share_code=%s, share_name=%s',page_total, page_index,
+                    self.share_codes[page_index]['code'], self.share_codes[page_index]['name'])
 
-        json_obj = demjson.decode(json_text)
-        assert isinstance(json_obj, dict)
+        page = Selector(response)
 
-        page_data = json_obj['data']
-        assert isinstance(page_data, list)
-        for unit in page_data:
-            assert isinstance(unit, dict)
+        # 匹配到table2下head中的所有列, 并且判断列数是否与item字段数量匹配
+        table_head = page.xpath('//*[@id="Table2"]/thead/tr/th')
+        if len(table_head) != 8:
+            raise RuntimeError('table format is changed')
 
+        # 匹配到table2下的所有行
+        table_body = page.xpath('//*[@id="Table2"]/tbody/tr')
+
+        for i in range(len(table_body)):
             item = FinancialNoticeItem()
-            item['symbol'] = unit['scode']
-            item['name'] = unit['sname']
-            item['sclx'] = unit['sclx']
-            item['forecast_content'] = unit['forecastcontent']
+            item['symbol'] = self.share_codes[page_index]['code']
+            item['name'] = self.share_codes[page_index]['name']
 
-            item['forecast_left'] = unit['forecastl']
-            item['forecast_right'] = unit['forecastt']
+            # 业绩变动内容
+            path = '//*[@id="Table2"]/tbody/tr[{}]/td[2]/span/text()'.format(i+1)
+            item['forecast_content'] = page.xpath(path).extract()
 
-            item['increase_left'] = unit['increasel']
-            item['increase_right'] = unit['increaset']
+            # 预计净利润
+            path = '//*[@id="Table2"]/tbody/tr[{}]/td[3]/text()'.format(i+1)
+            item['forecast_left'] = page.xpath(path).extract()
 
-            item['change_reason'] = unit['changereasondscrpt']
-            item['preview_type'] = unit['forecasttype']
-            item['previous_year_profit'] = unit['yearearlier']
-            item['hymc'] = unit['hymc']
-            item['announcement_date'] = unit['ndate']
+            # 业绩变动幅度
+            path = '//*[@id="Table2"]/tbody/tr[{}]/td[4]/span/text()'.format(i+1)
+            increase_left_list = page.xpath(path).extract()
+            if len(increase_left_list) == 1:
+                item['increase_left'] = increase_left_list[0]
+            elif len(increase_left_list) == 2:
+                item['increase_left'] = increase_left_list[0]
+                item['increase_left'] = '~'
+                item['increase_left'] = increase_left_list[1]
+            else:
+                item['increase_left'] = ''
 
-            yield item
+            # 过期字段，占位用
+            item['forecast_right'] = ''
+            item['increase_right'] = ''
 
-        page_total = json_obj['pages']
-        page_size = response.meta['page_size']
-        page_no = response.meta['page_no']
-        logger.info('page_total=%s, page_no=%s, page_size=%s', page_total, page_no, page_size)
+            # 业绩变动原因
+            path = '//*[@id="Table2"]/tbody/tr[{}]/td[5]/text()'.format(i+1)
+            item['change_reason'] = page.xpath(path).extract()
 
-        if page_no < page_total:
-            page_no += 1
-            next_url = re.sub('p=\d+', 'p={}'.format(page_no), response.url)
+            # 预告类型
+            path = '//*[@id="Table2"]/tbody/tr[{}]/td[6]/span/text()'.format(i + 1)
+            item['preview_type'] = page.xpath(path).extract()
+
+            # 上年同期净利润
+            path = '//*[@id="Table2"]/tbody/tr[{}]/td[7]/span/text()'.format(i + 1)
+            item['previous_year_profit'] = page.xpath(path).extract()
+
+            # 公告日期
+            path = '//*[@id="Table2"]/tbody/tr[{}]/td[8]/span/text()'.format(i + 1)
+            item['announcement_date'] = page.xpath(path).extract()
+
+            # 过滤掉那些没有业绩变动的内容
+            if item['announcement_date'] is not None:
+                yield item
+
+        # 更新下一个待爬取的url后返回
+        if page_index < page_total:
+            # 更新下一支股票的code
+            page_index += 1
+            next_url = re.sub('\d+', '{}'.format(self.share_codes[page_index]['code']), response.url)
+
             yield Request(
                 url=next_url,
-                meta={'page_no': page_no, 'page_size': page_size}
+                meta={'page_index': page_index, 'page_total': page_total}
             )
-
             logger.info('next_url=%s', next_url)
+        else:
+            logger.info('{} is finished'.format(self.name))
