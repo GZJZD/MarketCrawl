@@ -1,4 +1,17 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# encoding: utf-8
+
+'''
+@author: panhongfa
+@license: (C) Copyright 2017-2020, Node Supply Chain Manager Corporation Limited.
+@contact: panhongfas@163.com
+@software: PyCharm
+@file: ShareBuybackSpider.py
+@time: 2018/8/10 14:52
+@desc: 股权质押爬虫, JS接口支持全量查询，可不需要按照code进行分页查询
+@format: var xxxx={code: 0,count: N, data: [{...}, {...}], pageindex: N, pages: N, pagesize: N}
+'''
+
 from scrapy.spiders import Spider
 from scrapy.http import Request
 from scrapy.http import Response
@@ -25,6 +38,8 @@ class SharePledgeSpider(Spider):
         s = cls()
         crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
         crawler.signals.connect(s.spider_closed, signal=signals.spider_closed)
+        s.set_crawler(crawler)
+
         return s
 
     def spider_opened(self, spider):
@@ -60,7 +75,7 @@ class SharePledgeSpider(Spider):
 
         # 初始赋值
         param_list['pageindex'] = 1
-        param_list['pagesize'] = 300
+        param_list['pagesize'] = 200
         param_list['orderby'] = 'updatedate'
         param_list['order'] = 'desc'
         param_list['jsonp_callback'] = 'var%20{}=(x)'.format(self.generate_random_prefix())
@@ -85,46 +100,48 @@ class SharePledgeSpider(Spider):
     def parse(self, response):
         assert isinstance(response, Response)
         # 去除头部的'=', 得到json格式的文本
-        body_list = re.split('^[^=]*(?=)=', str(response.body))
-        json_text = body_list[1]
+        body_list = re.split('^[^=]*(=+)', str(response.body))
+        json_text = body_list[2]
 
+        # 解析pagedata的JSON数据体，构造并填充item对象后返回
         json_obj = demjson.decode(json_text)
-        assert isinstance(json_obj, dict)
+        if 'data' in json_obj and len(json_obj['data']) > 0:
+            page_data = json_obj['data']
+            assert isinstance(page_data, list)
+            for unit in page_data:
+                assert isinstance(unit, dict)
 
-        page_data = json_obj['data']
-        assert isinstance(page_data, list)
-        for unit in page_data:
-            assert isinstance(unit, dict)
+                item = SharePledgeItem()
+                item['symbol'] = unit['scode']
+                item['name'] = unit['sname']
+                item['shareholders_name'] = unit['gd_name']
 
-            item = SharePledgeItem()
-            item['symbol'] = unit['scode']
-            item['name'] = unit['sname']
-            item['shareholders_name'] = unit['gd_name']
+                item['pledge_number'] = unit['new_zy_count']
+                item['pledge_volumn'] = unit['amtsharefrozen']
+                item['pledge_price'] = unit['sz']
 
-            item['pledge_number'] = unit['new_zy_count']
-            item['pledge_volumn'] = unit['amtsharefrozen']
-            item['pledge_price'] = unit['sz']
+                # 占所持股份比例需要乘以100%
+                item['share_ratio'] = string.atof(str(unit['zb'])) * 100
+                item['equity_datio'] = unit['zzb']
 
-            # 占所持股份比例需要乘以100%
-            item['share_ratio'] = string.atof(str(unit['zb'])) * 100
-            item['equity_datio'] = unit['zzb']
+                item['close_position_range_left'] = unit['pcx_minvalue']
+                item['close_position_range_right'] = unit['pcx_maxvalue']
 
-            item['close_position_range_left'] = unit['pcx_minvalue']
-            item['close_position_range_right'] = unit['pcx_maxvalue']
+                item['warning_position_range_left'] = unit['yjx_minvalue']
+                item['warning_position_range_right'] = unit['yjx_maxvalue']
 
-            item['warning_position_range_left'] = unit['yjx_minvalue']
-            item['warning_position_range_right'] = unit['yjx_maxvalue']
+                # 获取到的是UTC时间，这里将UTC时间转换成字符串时间
+                if unit['updatedate'] is None:
+                    l_update_date = 0
+                else:
+                    l_update_date = string.atoi(str(unit['updatedate']))
 
-            # 获取到的是UTC时间，这里将UTC时间转换成字符串时间
-            if unit['updatedate'] is None:
-                l_update_date = 0
-            else:
-                l_update_date = string.atoi(str(unit['updatedate']))
+                # 获取UTC时间转换后的时间戳
+                item['update_date'] = self.transfrom_beijing_time(l_update_date)
 
-            # 获取UTC时间转换后的时间戳
-            item['update_date'] = self.transfrom_beijing_time(l_update_date)
-
-            yield item
+                yield item
+        else:
+            logger.info('page_data data is empty')
 
         page_total = json_obj['pages']
         page_size = response.meta['page_size']
@@ -139,3 +156,5 @@ class SharePledgeSpider(Spider):
                 url=next_url,
                 meta={'page_no': page_no, 'page_size': page_size}
             )
+        else:
+            logger.info('{} is finished'.format(self.name))
