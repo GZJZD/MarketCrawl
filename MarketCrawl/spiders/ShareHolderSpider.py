@@ -147,3 +147,5 @@ class ShareHolderSpider(Spider):
             )
 
             logger.info('next_url=%s', next_url)
+        else:
+            logger.info('{} is finished'.format(self.name))

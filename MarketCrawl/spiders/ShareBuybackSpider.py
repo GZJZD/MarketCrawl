@@ -1,4 +1,17 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# encoding: utf-8
+
+'''
+@author: panhongfa
+@license: (C) Copyright 2017-2020, Node Supply Chain Manager Corporation Limited.
+@contact: panhongfas@163.com
+@software: PyCharm
+@file: ShareBuybackSpider.py
+@time: 2018/8/10 14:52
+@desc: 股票回购爬虫, JS接口支持全量查询，不需要按照code进行分页查询
+@format: var xxxx={code: 0,count: N, data: [{...}, {...}], pageindex: N, pages: N, pagesize: N}
+'''
+
 from scrapy.spiders import Spider
 from scrapy.http import Request
 from scrapy.http import Response
@@ -25,6 +38,8 @@ class ShareBuybackSpider(Spider):
         s = cls()
         crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
         crawler.signals.connect(s.spider_closed, signal=signals.spider_closed)
+        s.set_crawler(crawler)
+
         return s
 
     def spider_opened(self, spider):
@@ -60,7 +75,7 @@ class ShareBuybackSpider(Spider):
 
         # 初始赋值
         param_list['pageindex'] = 1
-        param_list['pagesize'] = 300
+        param_list['pagesize'] = 100
         param_list['orderby'] = 'dim_date'
         param_list['order'] = 'desc'
         param_list['jsonp_callback'] = 'var%20{}=(x)'.format(self.generate_random_prefix())
@@ -86,56 +101,59 @@ class ShareBuybackSpider(Spider):
     def parse(self, response):
         assert isinstance(response, Response)
         # 去除头部的'=', 得到json格式的文本
-        body_list = re.split('^[^=]*(?=)=', str(response.body))
-        json_text = body_list[1]
+        body_list = re.split('^[^=]*(=+)', str(response.body))
+        json_text = body_list[2]
 
+        # 解析pagedata的JSON数据体，构造并填充item对象后返回
         json_obj = demjson.decode(json_text)
-        assert isinstance(json_obj, dict)
+        if 'data' in json_obj and len(json_obj['data']) > 0:
+            page_data = json_obj['data']
 
-        page_data = json_obj['data']
-        assert isinstance(page_data, list)
-        for unit in page_data:
-            assert isinstance(unit, dict)
+            assert isinstance(page_data, list)
+            for unit in page_data:
+                assert isinstance(unit, dict)
 
-            item = ShareBuybackItem()
-            item['symbol'] = unit['dim_scode']
-            item['name'] = unit['securityshortname']
-            item['new_price'] = unit['newprice']
+                item = ShareBuybackItem()
+                item['symbol'] = unit['dim_scode']
+                item['name'] = unit['securityshortname']
+                item['new_price'] = unit['newprice']
 
-            item['buyback_price_range_left'] = unit['repurpricelower']
-            item['buyback_price_range_right'] = unit['repurpricecap']
+                item['buyback_price_range_left'] = unit['repurpricelower']
+                item['buyback_price_range_right'] = unit['repurpricecap']
 
-            item['close_price'] = unit['cprice']
-            item['buyback_volumn_range_left'] = unit['repurnumlower']
-            item['buyback_volumn_range_right'] = unit['repurnumcap']
+                item['close_price'] = unit['cprice']
+                item['buyback_volumn_range_left'] = unit['repurnumlower']
+                item['buyback_volumn_range_right'] = unit['repurnumcap']
 
-            item['share_ratio_left'] = unit['ltszxx']
-            item['share_ratio_right'] = unit['ltszsx']
+                item['share_ratio_left'] = unit['ltszxx']
+                item['share_ratio_right'] = unit['ltszsx']
 
-            item['equity_ratio_left'] = unit['zszxx']
-            item['equity_ratio_right'] = unit['zszsx']
+                item['equity_ratio_left'] = unit['zszxx']
+                item['equity_ratio_right'] = unit['zszsx']
 
-            item['buyback_amount_range_left'] = unit['repuramountlower']
-            item['buyback_amount_range_right'] = unit['repuramountlimit']
+                item['buyback_amount_range_left'] = unit['repuramountlower']
+                item['buyback_amount_range_right'] = unit['repuramountlimit']
 
-            item['impl_progress'] = unit['repurprogress']
+                item['impl_progress'] = unit['repurprogress']
 
-            # 获取到的是UTC时间，这里将UTC时间转换成字符串时间
-            if unit['repurstartdate'] is None:
-                l_start_date = 0
-            else:
-                l_start_date = string.atoi(str(unit['repurstartdate']))
+                # 获取到的是UTC时间，这里将UTC时间转换成字符串时间
+                if unit['repurstartdate'] is None:
+                    l_start_date = 0
+                else:
+                    l_start_date = string.atoi(str(unit['repurstartdate']))
 
-            if unit['dim_tradedate'] is None:
-                l_dim_date = 0
-            else:
-                l_dim_date = string.atoi(str(unit['dim_tradedate']))
+                if unit['dim_tradedate'] is None:
+                    l_dim_date = 0
+                else:
+                    l_dim_date = string.atoi(str(unit['dim_tradedate']))
 
-            # 获取UTC时间转换后的时间戳
-            item['begin_date'] = self.transfrom_beijing_time(l_start_date)
-            item['announcement_date'] = self.transfrom_beijing_time(l_dim_date)
+                # 获取UTC时间转换后的时间戳
+                item['begin_date'] = self.transfrom_beijing_time(l_start_date)
+                item['announcement_date'] = self.transfrom_beijing_time(l_dim_date)
 
-            yield item
+                yield item
+        else:
+            logger.info('page_data data is empty')
 
         page_total = json_obj['pages']
         page_size = response.meta['page_size']
@@ -145,8 +163,10 @@ class ShareBuybackSpider(Spider):
         if page_no < page_total:
             page_no += 1
             next_url = re.sub('pageindex=\d+', 'pageindex={}'.format(page_no), response.url)
-            logger.info('next_url=%s', next_url)
             yield Request(
                 url=next_url,
                 meta={'page_no': page_no, 'page_size': page_size}
             )
+            logger.info('next_url=%s', next_url)
+        else:
+            logger.info('{} is finished'.format(self.name))
