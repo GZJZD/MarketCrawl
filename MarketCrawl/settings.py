@@ -43,6 +43,10 @@ LOG_LEVEL = 'INFO'
 LOG_ENCODING = 'utf-8'
 FEED_EXPORT_ENCODING = 'utf-8'
 
+DOWNLOAD_DELAY = 1
+RETRY_TIMES = 3
+DOWNLOAD_TIMEOUT = 60
+
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 #CONCURRENT_REQUESTS = 32
 

@@ -4,8 +4,8 @@ import sys
 
 #name = 'GridListSpider'
 #name = 'MainInfluxSpider'
-name = 'FinancialNoticeSpider'
-#name = 'ShareHolderSpider'
+#name = 'FinancialNoticeSpider'
+name = 'ShareHolderSpider'
 #name = 'ShareBuybackSpider'
 #name = 'SharePledgeSpider'
 #name = 'AnnouncementSpider'

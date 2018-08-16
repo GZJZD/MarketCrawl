@@ -2,9 +2,7 @@
 
 import logging
 from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import RotatingFileHandler
 import sys
-import re
 
 # 指定logger输出格式
 formatter = logging.Formatter('%(asctime)s\tFile \"%(filename)s\",line %(lineno)s\t%(levelname)s: %(message)s')

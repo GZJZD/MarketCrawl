@@ -11,3 +11,5 @@ MarketCrawl/*.json
 MarketCrawl/*.log
 MarketCrawl/*.log.*
 *.txt
+*.json
+*.log
