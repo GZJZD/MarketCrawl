@@ -1,4 +1,17 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# encoding: utf-8
+
+'''
+@author: panhongfa
+@license: (C) Copyright 2017-2020, Node Supply Chain Manager Corporation Limited.
+@contact: panhongfas@163.com
+@software: PyCharm
+@file: ShareBuybackSpider.py
+@time: 2018/8/10 14:52
+@desc: 股权限售解禁爬虫, JS接口支持全量查询，可不需要按照code进行分页查询
+@format: var xxxx={pages: N, data: ['...', '...'], url: ...}
+'''
+
 from scrapy.spiders import Spider
 from scrapy.http import Request
 from scrapy.http import Response
@@ -25,6 +38,8 @@ class RestrictedSpider(Spider):
         s = cls()
         crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
         crawler.signals.connect(s.spider_closed, signal=signals.spider_closed)
+        s.set_crawler(crawler)
+
         return s
 
     def spider_opened(self, spider):
@@ -98,49 +113,51 @@ class RestrictedSpider(Spider):
     def parse(self, response):
         assert isinstance(response, Response)
         # 去除头部的'=', 得到json格式的文本
-        body_list = re.split('^[^=]*(?=)=', str(response.body))
-        json_text = body_list[1]
+        body_list = re.split('^[^=]*(=+)', str(response.body))
+        json_text = body_list[2]
 
+        # 解析pagedata的JSON数据体，构造并填充item对象后返回
         json_obj = demjson.decode(json_text)
-        assert isinstance(json_obj, dict)
+        if 'data' in json_obj and len(json_obj['data']) > 0:
+            page_data = json_obj['data']
+            assert isinstance(page_data, list)
+            for unit in page_data:
+                assert isinstance(unit, dict)
 
-        page_data = json_obj['data']
-        assert isinstance(page_data, list)
-        for unit in page_data:
-            assert isinstance(unit, dict)
+                item = RestrictedItem()
+                item['symbol'] = unit['gpdm']
+                item['name'] = unit['sname']
 
-            item = RestrictedItem()
-            item['symbol'] = unit['gpdm']
-            item['name'] = unit['sname']
+                # 解禁时间，注意日期与时间采用'T'字符分割
+                item['circulation_date'] = unit['ltsj']
+                item['shareholders_num'] = unit['gpcjjgds']
+                item['share_num'] = unit['jjsl']
+                item['real_share_num'] = unit['kjjsl']
+                item['non_share_num'] = unit['wltsl']
+                item['real_share_price'] = unit['jjsz']
 
-            # 解禁时间，注意日期与时间采用'T'字符分割
-            item['circulation_date'] = unit['ltsj']
-            item['shareholders_num'] = unit['gpcjjgds']
-            item['share_num'] = unit['jjsl']
-            item['real_share_num'] = unit['kjjsl']
-            item['non_share_num'] = unit['wltsl']
-            item['real_share_price'] = unit['jjsz']
+                # 占总市值比例需要乘以100%
+                zzb_string = str(unit['zzb'])
+                if self.is_float_string(zzb_string):
+                    item['equity_ratio'] = string.atof(zzb_string) * 100
+                else:
+                    item['equity_ratio'] = zzb_string
 
-            # 占总市值比例需要乘以100%
-            zzb_string = str(unit['zzb'])
-            if self.is_float_string(zzb_string):
-                item['equity_ratio'] = string.atof(zzb_string) * 100
-            else:
-                item['equity_ratio'] = zzb_string
+                # 占流通市值比例需要乘以100%
+                zb_string = str(unit['zb'])
+                if self.is_float_string(zb_string):
+                    item['share_ratio'] = string.atof(zb_string) * 100
+                else:
+                    item['share_ratio'] = zb_string
 
-            # 占流通市值比例需要乘以100%
-            zb_string = str(unit['zb'])
-            if self.is_float_string(zb_string):
-                item['share_ratio'] = string.atof(zb_string) * 100
-            else:
-                item['share_ratio'] = zb_string
+                item['close_price'] = unit['newPrice']
+                item['share_type'] = unit['xsglx']
+                item['before_range'] = unit['jjqesrzdf']
+                item['after_range'] = unit['jjhesrzdf']
 
-            item['close_price'] = unit['newPrice']
-            item['share_type'] = unit['xsglx']
-            item['before_range'] = unit['jjqesrzdf']
-            item['after_range'] = unit['jjhesrzdf']
-
-            yield item
+                yield item
+        else:
+            logger.info('page_data data is empty')
 
         page_total = json_obj['pages']
         page_size = response.meta['page_size']
@@ -150,8 +167,10 @@ class RestrictedSpider(Spider):
         if page_no < page_total:
             page_no += 1
             next_url = re.sub('p=\d+', 'p={}'.format(page_no), response.url)
-            logger.info('next_url=%s', next_url)
             yield Request(
                 url=next_url,
                 meta={'page_no': page_no, 'page_size': page_size}
             )
+            logger.info('next_url=%s', next_url)
+        else:
+            logger.info('{} is finished'.format(self.name))

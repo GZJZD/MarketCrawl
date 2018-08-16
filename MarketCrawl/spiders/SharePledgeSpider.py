@@ -151,10 +151,10 @@ class SharePledgeSpider(Spider):
         if page_no < page_total:
             page_no += 1
             next_url = re.sub('pageindex=\d+', 'pageindex={}'.format(page_no), response.url)
-            logger.info('next_url=%s', next_url)
             yield Request(
                 url=next_url,
                 meta={'page_no': page_no, 'page_size': page_size}
             )
+            logger.info('next_url=%s', next_url)
         else:
             logger.info('{} is finished'.format(self.name))
