@@ -33,7 +33,7 @@ class FinancialNoticeSpider(Spider):
     allowed_domains = ['data.eastmoney.com', ]
     start_urls = ['http://data.eastmoney.com/bbsj/']
     custom_settings = {
-        'DOWNLOAD_DELAY': 0.2,
+        'DOWNLOAD_DELAY': 0.25,
         'RETRY_TIMES': 5,
         'DOWNLOAD_TIMEOUT': 60
     }
@@ -194,7 +194,7 @@ class FinancialNoticeSpider(Spider):
             item['announcement_date'] = page.xpath(path).extract()
 
             # 过滤掉那些没有业绩变动的内容
-            if item['announcement_date'] is not None:
+            if len(item['announcement_date']):
                 yield item
 
         # 更新下一个待爬取的url后返回

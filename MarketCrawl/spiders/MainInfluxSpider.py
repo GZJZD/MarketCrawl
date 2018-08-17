@@ -34,7 +34,7 @@ class MainInfluxSpider(Spider):
     allowed_domains = ['ff.eastmoney.com', ]
     start_urls = ['http://ff.eastmoney.com//EM_CapitalFlowInterface/api/js']
     custom_settings = {
-        'DOWNLOAD_DELAY': 0.2,
+        'DOWNLOAD_DELAY': 0.25,
         'RETRY_TIMES': 5,
         'DOWNLOAD_TIMEOUT': 60
     }

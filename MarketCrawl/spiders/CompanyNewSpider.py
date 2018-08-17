@@ -37,9 +37,9 @@ class CompanyNewSpider(Spider):
     allowed_domains = ['xueqiu.com', ]
     start_urls = ['https://xueqiu.com', 'https://xueqiu.com/statuses/stock_timeline.json']
     custom_settings = {
-        'DOWNLOAD_DELAY': 0.2,
+        'DOWNLOAD_DELAY': 0.25,
         'RETRY_TIMES': 5,
-        'DOWNLOAD_TIMEOUT': 30
+        'DOWNLOAD_TIMEOUT': 60
     }
 
     handle_httpstatus_list = [400]
