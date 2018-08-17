@@ -218,7 +218,7 @@ class CompanyAnnouncementSpider(Spider):
         share_total = response.meta['share_total']
         share_index = response.meta['share_index']
 
-        json_obj = demjson.decode(response.body)
+        json_obj = demjson.decode(str(response.body).decode('utf-8'))
         page_index = json_obj['page']
         page_total = json_obj['maxPage']
         page_size = json_obj['count']
