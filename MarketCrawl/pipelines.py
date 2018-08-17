@@ -84,7 +84,7 @@ class MarketCrawlSQLPipeline(object):
         elif spider.name is 'RestrictedSpider':
             query = self.db_pool.runInteraction(self.handle_insert_restricted, item)
             query.addErrback(self.handle_error)
-        elif spider.name is 'AnnouncementSpider':
+        elif spider.name is 'CompanyAnnouncementSpider':
             query = self.db_pool.runInteraction(self.handle_insert_announcement, item)
             query.addErrback(self.handle_error)
         else:
@@ -357,28 +357,25 @@ class MarketCrawlSQLPipeline(object):
     def handle_insert_announcement(self, cursor, item):
         # 待执行的SQL语句
         sql = """INSERT INTO crawler_company_announcement (
-                shares_code, shares_name, announce_title, announce_url, announce_type, announce_date, announce_url_md5) 
+                shares_code, shares_name, announce_title, announce_url, announce_type, announce_date, announce_id) 
         	    VALUES (%s,%s,%s,%s,%s,%s,%s) 
-        	    ON DUPLICATE KEY UPDATE shares_code=%s, announce_date=%s, announce_url_md5=%s"""
+        	    ON DUPLICATE KEY UPDATE shares_code=%s, announce_id=%s"""
 
         #从ITEM中获取SQL的数据项并定义为tupe类型
-        assert isinstance(item, AnnouncementItem)
+        assert isinstance(item, CompanyAnnouncementItem)
 
         params = []
         params.append(item['symbol'])
         params.append(item['name'])
         params.append(item['announce_title'])
         params.append(item['announce_url'])
-        params.append(item['announce_type'] if "announce_type" in item else '')
+        params.append(item['announce_type'])
 
-        # 处理circulation_date，时间和日期以‘T’来分割
-        date_and_hours = item['announce_date'].split(u'T')
-        params.append(date_and_hours[0])
-        params.append(item['announce_url_md5'])
+        params.append(item['announce_date'])
+        params.append(item['announce_id'])
 
         params.append(item['symbol'])
-        params.append(date_and_hours[0])
-        params.append(item['announce_url_md5'])
+        params.append(item['announce_id'])
 
         cursor.execute(sql, params)
 

@@ -8,7 +8,7 @@
 @software: PyCharm
 @file: MainInfluxSpider.py
 @time: 2018/8/10 14:52
-@desc: 主力流入爬虫
+@desc: 主力流入爬虫，需要根据股票代码构造url分页查询
 @format: aff_data={data: [..., ...]}
 '''
 
@@ -95,8 +95,6 @@ class MainInfluxSpider(Spider):
 
         else:
             raise RuntimeError('db_pool is None')
-
-        print spider.crawler.stats
 
     def spider_closed(self, spider):
         assert isinstance(self.db_connect, Connection)

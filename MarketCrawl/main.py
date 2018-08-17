@@ -8,8 +8,9 @@ import sys
 #name = 'ShareHolderSpider'
 #name = 'ShareBuybackSpider'
 #name = 'SharePledgeSpider'
-name = 'RestrictedSpider'
-#name = 'AnnouncementSpider'
+#name = 'RestrictedSpider'
+#name = 'CompanyAnnouncementSpider'
+name = 'CompanyAnnouncementSpider -a partial=True'
 cmd = "scrapy crawl {0}".format(name)
 cmdline.execute(cmd.split())
 

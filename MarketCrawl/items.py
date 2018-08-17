@@ -222,7 +222,7 @@ class RestrictedItem(Item):
     # 解禁后20日涨跌幅(%)
     after_range = Field()
 
-class AnnouncementItem(Item):
+class CompanyAnnouncementItem(Item):
     # 股票代码
     symbol = Field()
     # 股票名称
@@ -235,8 +235,8 @@ class AnnouncementItem(Item):
     announce_type = Field()
     # 公告日期
     announce_date = Field()
-    # url的MD5值
-    announce_url_md5 = Field()
+    # 公告的ID
+    announce_id = Field()
 
 class CompanyNewItem(Item):
     # 股票代码
