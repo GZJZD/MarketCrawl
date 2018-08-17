@@ -249,3 +249,5 @@ class CompanyNewItem(Item):
     news_url = Field()
     # 发布日期
     date = Field()
+    # 新闻的ID
+    news_id = Field()

@@ -87,6 +87,9 @@ class MarketCrawlSQLPipeline(object):
         elif spider.name is 'CompanyAnnouncementSpider':
             query = self.db_pool.runInteraction(self.handle_insert_announcement, item)
             query.addErrback(self.handle_error)
+        elif spider.name is 'CompanyNewSpider':
+            query = self.db_pool.runInteraction(self.handle_insert_new, item)
+            query.addErrback(self.handle_error)
         else:
             pass
 
@@ -379,8 +382,30 @@ class MarketCrawlSQLPipeline(object):
 
         cursor.execute(sql, params)
 
+    def handle_insert_new(self, cursor, item):
+        # 待执行的SQL语句
+        sql = """INSERT INTO crawler_company_news (
+                shares_code, shares_name, news_title, news_url, date, news_id) 
+        	    VALUES (%s,%s,%s,%s,%s,%s) 
+        	    ON DUPLICATE KEY UPDATE shares_code=%s, news_id=%s"""
+
+        #从ITEM中获取SQL的数据项并定义为tupe类型
+        assert isinstance(item, CompanyNewItem)
+
+        params = []
+        params.append(item['symbol'])
+        params.append(item['name'])
+        params.append(item['news_title'])
+        params.append(item['news_url'])
+
+        params.append(item['date'])
+        params.append(item['news_id'])
+
+        params.append(item['symbol'])
+        params.append(item['news_id'])
+
+        cursor.execute(sql, params)
+
     def handle_error(self, failure):
         # 输出错误日志
         logger.error('database operation exception, failure=%s', failure)
-
-

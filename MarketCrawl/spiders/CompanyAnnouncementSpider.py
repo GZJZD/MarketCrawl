@@ -185,7 +185,7 @@ class CompanyAnnouncementSpider(Spider):
         param_list['count'] = 20
 
         # ‘公告’的UTF-8编码，表示查询的是公告
-        param_list['source'] = '%E5%85%AC%E5%91%8A'
+        param_list['source'] = '公告'
 
         # 当前页码
         param_list['page'] = 1
