@@ -17,7 +17,7 @@ from scrapy.http import Request
 from scrapy.http import Response
 from scrapy import signals
 from collections import OrderedDict
-from MarketCrawl.logger import logger
+#from MarketCrawl.logger import logger
 from MarketCrawl.items import *
 from pymysql.connections import Connection
 from pymysql.cursors import Cursor

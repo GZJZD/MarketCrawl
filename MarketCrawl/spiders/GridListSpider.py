@@ -18,7 +18,6 @@ from scrapy.http import Response
 from scrapy import signals
 from scrapy.loader import ItemLoader
 from collections import OrderedDict
-from MarketCrawl.logger import logger
 from MarketCrawl.items import BasicIndicatorItem
 import time
 import demjson
@@ -29,21 +28,27 @@ class GridListSpider(Spider):
     allowed_domains = ['nufm.dfcfw.com']
     start_urls = ['http://nufm.dfcfw.com/EM_Finance2014NumericApplication/JS.aspx']
 
+    custom_settings = {
+        #'LOG_FILE': './log/{}'.format(__name__)
+    }
+
     @classmethod
     def from_crawler(cls, crawler):
         # This method is used by Scrapy to create your spiders.
         s = cls()
         crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
         crawler.signals.connect(s.spider_closed, signal=signals.spider_closed)
+        s.set_crawler(crawler)
+
         return s
 
     def spider_opened(self, spider):
         assert isinstance(spider, Spider)
-        logger.info('###############################%s Start###################################', spider.name)
+        self.logger.info('###############################%s Start###################################', spider.name)
 
     def spider_closed(self, spider):
         assert isinstance(spider, Spider)
-        logger.info('###############################%s End#####################################', spider.name)
+        self.logger.info('###############################%s End#####################################', spider.name)
 
     @staticmethod
     def current_milli_time():
@@ -77,7 +82,7 @@ class GridListSpider(Spider):
                 query_param += '&{0}={1}'.format(*kv)
 
         begin_url = self.start_urls[0] + query_param
-        logger.info('begin_url=%s', begin_url)
+        self.logger.info('begin_url=%s', begin_url)
 
         yield Request(
             url=begin_url,
@@ -129,7 +134,7 @@ class GridListSpider(Spider):
         record_total = json_obj['recordsFiltered']
         page_size = response.meta['page_size']
         page_no = response.meta['page_no']
-        logger.info('record_total = %s, page_no = %s, page_size = %s, undo_size = %s',
+        self.logger.info('record_total = %s, page_no = %s, page_size = %s, undo_size = %s',
                     record_total, page_no, page_size, record_total - page_no * page_size)
 
         if page_no * page_size < record_total:
@@ -140,6 +145,6 @@ class GridListSpider(Spider):
                 meta={'page_no': page_no, 'page_size': page_size}
             )
 
-            logger.info('next_url=%s', next_url)
+            self.logger.info('next_url=%s', next_url)
         else:
-            logger.info('{} is finished'.format(self.name))
+            self.logger.info('{} is finished'.format(self.name))

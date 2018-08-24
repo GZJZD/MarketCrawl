@@ -9,7 +9,8 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
-import random
+import os
+import scrapy.downloadermiddlewares.httpproxy
 
 BOT_NAME = 'MarketCrawl'
 
@@ -19,106 +20,52 @@ NEWSPIDER_MODULE = 'MarketCrawl.spiders'
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'MarketCrawl (+http://www.yourdomain.com)'
-# user agent 列表
-USER_AGENT_LIST = [
-    'MSIE (MSIE 6.0; X11; Linux; i686) Opera 7.23',
-    'Opera/9.20 (Macintosh; Intel Mac OS X; U; en)',
-    'Opera/9.0 (Macintosh; PPC Mac OS X; U; en)',
-    'iTunes/9.0.3 (Macintosh; U; Intel Mac OS X 10_6_2; en-ca)',
-    'Mozilla/4.76 [en_jp] (X11; U; SunOS 5.8 sun4u)',
-    'iTunes/4.2 (Macintosh; U; PPC Mac OS X 10.2)',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:5.0) Gecko/20100101 Firefox/5.0',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:9.0) Gecko/20100101 Firefox/9.0',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:16.0) Gecko/20120813 Firefox/16.0',
-    'Mozilla/4.77 [en] (X11; I; IRIX;64 6.5 IP30)',
-    'Mozilla/4.8 [en] (X11; U; SunOS; 5.7 sun4u)'
-]
-# 随机生成user agent
-USER_AGENT = random.choice(USER_AGENT_LIST)
+
+# 调用相应的浏览器类型属性就可以生成相应的User-Agent<br>ua.chrome<br>ua.firefox<br>ua.ie<br>ua.random
+USER_AGETN_TYPE = 'random'
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
 
+# 日志设定
 LOG_LEVEL = 'INFO'
 LOG_ENCODING = 'utf-8'
-FEED_EXPORT_ENCODING = 'utf-8'
+LOG_FORMAT = '%(asctime)s\tFile \"%(filename)s\",line %(lineno)s\t%(levelname)s: %(message)s'
 
+# 全局的下载延时相关参数配置
 DOWNLOAD_DELAY = 1
 RETRY_TIMES = 3
 DOWNLOAD_TIMEOUT = 60
+RETRY_HTTP_CODES = [500, 502, 503, 504, 400, 403, 404, 408]
 
-# Configure maximum concurrent requests performed by Scrapy (default: 16)
-#CONCURRENT_REQUESTS = 32
+# 数据和日志目录设定
+JSON_DATA_DIR = './data'
+if not os.path.exists(JSON_DATA_DIR):
+    os.mkdir(JSON_DATA_DIR)
 
-# Configure a delay for requests for the same website (default: 0)
-# See http://scrapy.readthedocs.org/en/latest/topics/settings.html#download-delay
-# See also autothrottle settings and docs
+LOG_FILES_DIR = './log'
+if not os.path.exists(LOG_FILES_DIR):
+    os.mkdir(LOG_FILES_DIR)
 
-# The download delay setting will honor only one of:
-#CONCURRENT_REQUESTS_PER_DOMAIN = 16
-#CONCURRENT_REQUESTS_PER_IP = 16
+# 代理服务器地址
+HTTPS_PROXY = 'http://127.0.0.1:8000'
 
-# Disable cookies (enabled by default)
-#COOKIES_ENABLED = False
+# 一定分钟数后切换回不用代理, 因为用代理影响到速度
+RECOVER_INTERVAL = 20
 
-# Disable Telnet Console (enabled by default)
-#TELNETCONSOLE_ENABLED = False
-
-# Override the default request headers:
-#DEFAULT_REQUEST_HEADERS = {
-#   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-#   'Accept-Language': 'en',
-#}
-
-# Enable or disable spider middlewares
-# See http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
-#SPIDER_MIDDLEWARES = {
-#    '$project_name.middlewares.MarketcrawlSpiderMiddleware': 543,
-#}
-
-# Enable or disable downloader middlewares
-# See http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
-#DOWNLOADER_MIDDLEWARES = {
-#    '$project_name.middlewares.MarketcrawlDownloaderMiddleware': 543,
-#}
-
-# Enable or disable extensions
-# See http://scrapy.readthedocs.org/en/latest/topics/extensions.html
-#EXTENSIONS = {
-#    'scrapy.extensions.telnet.TelnetConsole': None,
-#}
-
-# Configure item pipelines
-# See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    '$project_name.pipelines.MarketcrawlPipeline': 300,
-#}
+# 加载pipelines项
 ITEM_PIPELINES = {
     'MarketCrawl.pipelines.MarketCrawlJsonPipeline': 300, #保存到文件
     'MarketCrawl.pipelines.MarketCrawlSQLPipeline': 300,  #保存到mysql数据库
 }
 
-# Enable and configure the AutoThrottle extension (disabled by default)
-# See http://doc.scrapy.org/en/latest/topics/autothrottle.html
-#AUTOTHROTTLE_ENABLED = True
-# The initial download delay
-#AUTOTHROTTLE_START_DELAY = 30
-# The maximum download delay to be set in case of high latencies
-#AUTOTHROTTLE_MAX_DELAY = 90
-# The average number of requests Scrapy should be sending in parallel to
-# each remote server
-#AUTOTHROTTLE_TARGET_CONCURRENCY = 1.0
-# Enable showing throttling stats for every response received:
-#AUTOTHROTTLE_DEBUG = False
+# 取消默认的useragent,使用新的useragent
+DOWNLOADER_MIDDLEWARES = {
+    'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': None,
+    'MarketCrawl.middlewares.MarketcrawlUserAgentMiddleware': 300,
+}
 
-# Enable and configure HTTP caching (disabled by default)
-# See http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html#httpcache-middleware-settings
-#HTTPCACHE_ENABLED = True
-#HTTPCACHE_EXPIRATION_SECS = 0
-#HTTPCACHE_DIR = 'httpcache'
-#HTTPCACHE_IGNORE_HTTP_CODES = []
-#HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
-
+# 数据库配置
 DATABASE_CONNECTION = {
     "MYSQL_HOST": "47.52.77.50",
     "MYSQL_PORT": 3306,
@@ -126,3 +73,4 @@ DATABASE_CONNECTION = {
     "MYSQL_PASSWORD": "1",
     "MYSQL_DATABASE": "options",
 }
+

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from twisted.enterprise import adbapi
-from MarketCrawl.logger import logger
 from MarketCrawl.items import *
 from scrapy.spiders import Spider
 import codecs
@@ -26,7 +25,8 @@ class MarketCrawlJsonPipeline(object):
 
     def open_spider(self, spider):
         assert isinstance(spider, Spider)
-        self.file_handler[spider.name] = codecs.open('{}.json'.format(spider.name), 'w', encoding='utf-8')
+        data_path = spider.settings['JSON_DATA_DIR']
+        self.file_handler[spider.name] = codecs.open('{}/{}.json'.format(data_path, spider.name), 'w', encoding='utf-8')
 
     def close_spider(self, spider):
         assert isinstance(spider, Spider)
@@ -52,7 +52,7 @@ class MarketCrawlSQLPipeline(object):
             charset="utf8",
         )
 
-        pool = adbapi.ConnectionPool("pymysql", **db_parms)
+        pool = adbapi.ConnectionPool("pymysql", cp_reconnect=True, **db_parms)
         return cls(pool)
 
     def open_spider(self, spider):
@@ -65,31 +65,31 @@ class MarketCrawlSQLPipeline(object):
         assert isinstance(spider, Spider)
         if spider.name is 'GridListSpider':
             query = self.db_pool.runInteraction(self.handle_insert_grid_list, item)
-            query.addErrback(self.handle_error)
+            query.addErrback(self.handle_error, spider)
         elif spider.name is 'MainInfluxSpider':
             query = self.db_pool.runInteraction(self.handle_insert_main_influx, item)
-            query.addErrback(self.handle_error)
+            query.addErrback(self.handle_error, spider)
         elif spider.name is 'FinancialNoticeSpider':
             query = self.db_pool.runInteraction(self.handle_insert_financial_notice, item)
-            query.addErrback(self.handle_error)
+            query.addErrback(self.handle_error, spider)
         elif spider.name is 'ShareHolderSpider':
             query = self.db_pool.runInteraction(self.handle_insert_share_holder, item)
-            query.addErrback(self.handle_error)
+            query.addErrback(self.handle_error, spider)
         elif spider.name is 'ShareBuybackSpider':
             query = self.db_pool.runInteraction(self.handle_insert_share_buyback, item)
-            query.addErrback(self.handle_error)
+            query.addErrback(self.handle_error, spider)
         elif spider.name is 'SharePledgeSpider':
             query = self.db_pool.runInteraction(self.handle_insert_share_pledge, item)
-            query.addErrback(self.handle_error)
+            query.addErrback(self.handle_error, spider)
         elif spider.name is 'RestrictedSpider':
             query = self.db_pool.runInteraction(self.handle_insert_restricted, item)
-            query.addErrback(self.handle_error)
+            query.addErrback(self.handle_error, spider)
         elif spider.name is 'CompanyAnnouncementSpider':
             query = self.db_pool.runInteraction(self.handle_insert_announcement, item)
-            query.addErrback(self.handle_error)
+            query.addErrback(self.handle_error, spider)
         elif spider.name is 'CompanyNewSpider':
             query = self.db_pool.runInteraction(self.handle_insert_new, item)
-            query.addErrback(self.handle_error)
+            query.addErrback(self.handle_error, spider)
         else:
             pass
 
@@ -406,6 +406,6 @@ class MarketCrawlSQLPipeline(object):
 
         cursor.execute(sql, params)
 
-    def handle_error(self, failure):
+    def handle_error(self, failure, spider):
         # 输出错误日志
-        logger.error('database operation exception, failure=%s', failure)
+        spider.logger.error('database operation exception, failure=%s', failure)

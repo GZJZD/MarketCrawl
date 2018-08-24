@@ -17,7 +17,6 @@ from scrapy.http import Request
 from scrapy.http import Response
 from scrapy import signals
 from collections import OrderedDict
-from MarketCrawl.logger import logger
 from MarketCrawl.items import *
 import time
 import pytz
@@ -32,6 +31,10 @@ class ShareBuybackSpider(Spider):
     allowed_domains = ['api.dataide.eastmoney.com',]
     start_urls = ['http://api.dataide.eastmoney.com/data/gethglist']
 
+    custom_settings = {
+        'LOG_FILE': './log/{}'.format(__name__)
+    }
+
     @classmethod
     def from_crawler(cls, crawler):
         # This method is used by Scrapy to create your spiders.
@@ -44,11 +47,11 @@ class ShareBuybackSpider(Spider):
 
     def spider_opened(self, spider):
         assert isinstance(spider, Spider)
-        logger.info('###############################%s Start###################################', spider.name)
+        self.logger.info('###############################%s Start###################################', spider.name)
 
     def spider_closed(self, spider):
         assert isinstance(spider, Spider)
-        logger.info('###############################%s End#####################################', spider.name)
+        self.logger.info('###############################%s End#####################################', spider.name)
 
     @staticmethod
     # 生成一个指定长度的随机字符串
@@ -91,7 +94,7 @@ class ShareBuybackSpider(Spider):
                 query_param += '&{0}={1}'.format(*kv)
 
         begin_url = self.start_urls[0] + query_param
-        logger.info('begin_url=%s', begin_url)
+        self.logger.info('begin_url=%s', begin_url)
 
         yield Request(
             url=begin_url,
@@ -153,12 +156,12 @@ class ShareBuybackSpider(Spider):
 
                 yield item
         else:
-            logger.info('page_data data is empty')
+            self.logger.info('page_data data is empty')
 
         page_total = json_obj['pages']
         page_size = response.meta['page_size']
         page_no = response.meta['page_no']
-        logger.info('page_total=%s, page_no=%s, page_size=%s', page_total, page_no, page_size)
+        self.logger.info('page_total=%s, page_no=%s, page_size=%s', page_total, page_no, page_size)
 
         if page_no < page_total:
             page_no += 1
@@ -167,6 +170,6 @@ class ShareBuybackSpider(Spider):
                 url=next_url,
                 meta={'page_no': page_no, 'page_size': page_size}
             )
-            logger.info('next_url=%s', next_url)
+            self.logger.info('next_url=%s', next_url)
         else:
-            logger.info('{} is finished'.format(self.name))
+            self.logger.info('{} is finished'.format(self.name))

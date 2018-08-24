@@ -17,7 +17,6 @@ from scrapy.http import Request
 from scrapy.http import Response
 from scrapy import signals
 from collections import OrderedDict
-from MarketCrawl.logger import logger
 from MarketCrawl.items import *
 from pymysql.connections import Connection
 from pymysql.cursors import Cursor
@@ -36,7 +35,8 @@ class MainInfluxSpider(Spider):
     custom_settings = {
         'DOWNLOAD_DELAY': 0.25,
         'RETRY_TIMES': 5,
-        'DOWNLOAD_TIMEOUT': 60
+        'DOWNLOAD_TIMEOUT': 60,
+        'LOG_FILE': './log/{}'.format(__name__)
     }
 
     db_connect = None
@@ -68,7 +68,7 @@ class MainInfluxSpider(Spider):
 
     def spider_opened(self, spider):
         assert isinstance(spider, Spider)
-        logger.info('###############################%s Start###################################', spider.name)
+        self.logger.info('###############################%s Start###################################', spider.name)
 
         if self.db_connect is not None:
             assert isinstance(self.db_connect, Connection)
@@ -101,7 +101,7 @@ class MainInfluxSpider(Spider):
         self.db_connect.close()
 
         assert isinstance(spider, Spider)
-        logger.info('###############################%s End#####################################', spider.name)
+        self.logger.info('###############################%s End#####################################', spider.name)
 
     @staticmethod
     # 生成一个指定长度的随机字符串
@@ -143,7 +143,7 @@ class MainInfluxSpider(Spider):
                 query_param += '&{0}={1}'.format(*kv)
 
         begin_url = self.start_urls[0] + query_param
-        logger.info('begin_url=%s', begin_url)
+        self.logger.info('begin_url=%s', begin_url)
 
         yield Request(
             url=begin_url,
@@ -155,7 +155,7 @@ class MainInfluxSpider(Spider):
 
         page_total = response.meta['page_total']
         page_index = response.meta['page_index']
-        logger.info('page_total=%s, page_index=%s, share_code=%s, share_name=%s',page_total, page_index,
+        self.logger.info('page_total=%s, page_index=%s, share_code=%s, share_name=%s',page_total, page_index,
                     self.share_codes[page_index]['code'], self.share_codes[page_index]['name'])
 
         # 去除头部的'=', 得到json格式的文本
@@ -188,7 +188,7 @@ class MainInfluxSpider(Spider):
 
                 yield item
         else:
-            logger.info('page_data data is empty')
+            self.logger.info('page_data data is empty')
 
         # 更新下一个待爬取的url后返回
         if page_index < page_total:
@@ -200,6 +200,6 @@ class MainInfluxSpider(Spider):
                 url=next_url,
                 meta={'page_index': page_index, 'page_total': page_total}
             )
-            logger.info('next_url=%s', next_url)
+            self.logger.info('next_url=%s', next_url)
         else:
-            logger.info('{} is finished'.format(self.name))
+            self.logger.info('{} is finished'.format(self.name))

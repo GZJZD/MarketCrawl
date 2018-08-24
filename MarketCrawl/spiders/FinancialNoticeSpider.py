@@ -17,7 +17,6 @@ from scrapy.http import Request
 from scrapy.http import Response
 from scrapy import signals
 from scrapy.selector import Selector
-from MarketCrawl.logger import logger
 from MarketCrawl.items import *
 from pymysql.connections import Connection
 from pymysql.cursors import Cursor
@@ -35,7 +34,8 @@ class FinancialNoticeSpider(Spider):
     custom_settings = {
         'DOWNLOAD_DELAY': 0.25,
         'RETRY_TIMES': 5,
-        'DOWNLOAD_TIMEOUT': 60
+        'DOWNLOAD_TIMEOUT': 60,
+        'LOG_FILE': './log/{}'.format(__name__)
     }
 
     db_connect = None
@@ -67,7 +67,7 @@ class FinancialNoticeSpider(Spider):
 
     def spider_opened(self, spider):
         assert isinstance(spider, Spider)
-        logger.info('###############################%s Start###################################', spider.name)
+        self.logger.info('###############################%s Start###################################', spider.name)
 
         if self.db_connect is not None:
             assert isinstance(self.db_connect, Connection)
@@ -100,7 +100,7 @@ class FinancialNoticeSpider(Spider):
         self.db_connect.close()
 
         assert isinstance(spider, Spider)
-        logger.info('###############################%s End#####################################', spider.name)
+        self.logger.info('###############################%s End#####################################', spider.name)
 
     @staticmethod
     # 生成一个指定长度的随机字符串
@@ -124,7 +124,7 @@ class FinancialNoticeSpider(Spider):
         query_param += '.html'
 
         begin_url = self.start_urls[0] + query_param
-        logger.info('begin_url=%s', begin_url)
+        self.logger.info('begin_url=%s', begin_url)
 
         yield Request(
             url=begin_url,
@@ -135,7 +135,7 @@ class FinancialNoticeSpider(Spider):
         assert isinstance(response, Response)
         page_total = response.meta['page_total']
         page_index = response.meta['page_index']
-        logger.info('page_total=%s, page_index=%s, share_code=%s, share_name=%s',page_total, page_index,
+        self.logger.info('page_total=%s, page_index=%s, share_code=%s, share_name=%s',page_total, page_index,
                     self.share_codes[page_index]['code'], self.share_codes[page_index]['name'])
 
         page = Selector(response)
@@ -207,6 +207,6 @@ class FinancialNoticeSpider(Spider):
                 url=next_url,
                 meta={'page_index': page_index, 'page_total': page_total}
             )
-            logger.info('next_url=%s', next_url)
+            self.logger.info('next_url=%s', next_url)
         else:
-            logger.info('{} is finished'.format(self.name))
+            self.logger.info('{} is finished'.format(self.name))
