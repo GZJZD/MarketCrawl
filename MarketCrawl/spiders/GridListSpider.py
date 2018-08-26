@@ -29,7 +29,7 @@ class GridListSpider(Spider):
     start_urls = ['http://nufm.dfcfw.com/EM_Finance2014NumericApplication/JS.aspx']
 
     custom_settings = {
-        #'LOG_FILE': './log/{}'.format(__name__)
+        'LOG_FILE': './log/{}'.format(__name__)
     }
 
     @classmethod
