@@ -11,10 +11,10 @@ import sys
 #name = 'RestrictedSpider'
 #name = 'CompanyAnnouncementSpider'
 #name = 'CompanyAnnouncementSpider -a mode=period'
-name = 'CompanyAnnouncementSpider -a mode=newest'
+#name = 'CompanyAnnouncementSpider -a mode=newest'
 #name = 'CompanyNewSpider'
 #name = 'CompanyNewSpider -a mode=period'
-#name = 'CompanyNewSpider -a mode=newest'
+name = 'CompanyNewSpider -a mode=newest'
 cmd = "scrapy crawl {0}".format(name)
 cmdline.execute(cmd.split())
 

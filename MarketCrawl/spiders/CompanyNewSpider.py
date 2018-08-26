@@ -53,7 +53,7 @@ class CompanyNewSpider(Spider):
         self.cur_utc = self.current_utc_time(ty='ms')
 
         self.share_codes = []
-        self.last_announce = {}
+        self.last_news = {}
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
@@ -99,12 +99,12 @@ class CompanyNewSpider(Spider):
             }
             self.share_codes.append(share)
 
-    def fetch_last_announce_info(self, connect):
+    def fetch_last_news_info(self, connect):
         assert isinstance(connect, Connection)
         cursor = connect.cursor()
 
-        sql = '''SELECT shares_code, MAX(announce_id), MAX(announce_date) 
-        FROM crawler_company_announcement GROUP BY shares_code'''
+        sql = '''SELECT shares_code, MAX(news_id), MAX(date) 
+        FROM crawler_company_news GROUP BY shares_code'''
 
         # 同步执行sql查询指令
         assert isinstance(cursor, Cursor)
@@ -117,11 +117,11 @@ class CompanyNewSpider(Spider):
             assert isinstance(feild, tuple)
             share = {
                 'code': feild[0],
-                'announce_id': feild[1],
-                'announce_utc': self.bj_to_utc(feild[2], ty='ms', fm='%Y-%m-%d %H:%M'),
+                'news_id': feild[1],
+                'news_utc': self.bj_to_utc(feild[2], ty='ms', fm='%Y-%m-%d %H:%M'),
             }
 
-            self.last_announce[feild[0]] = share
+            self.last_news[feild[0]] = share
 
     def spider_opened(self, spider):
         assert isinstance(spider, Spider)
@@ -129,7 +129,7 @@ class CompanyNewSpider(Spider):
 
         if self.db_connect is not None:
             self.fetch_all_shares(self.db_connect)
-            self.fetch_last_announce_info(self.db_connect)
+            self.fetch_last_news_info(self.db_connect)
         else:
             raise RuntimeError('db_connect is None')
 
@@ -227,7 +227,7 @@ class CompanyNewSpider(Spider):
         param_list['count'] = 20
 
         # ‘新闻’的UTF-8编码，表示查询的是新闻
-        param_list['source'] = '新闻'
+        param_list['source'] = '自选股新闻'
 
         # 当前页码
         param_list['page'] = 1
@@ -262,29 +262,28 @@ class CompanyNewSpider(Spider):
         min_create_utc = sys.maxint * 10000
         max_create_utc = 0
         for unit in page_data:
-            item = CompanyAnnouncementItem()
+            item = CompanyNewItem()
             item['symbol'] = self.share_codes[share_index]['code']
             item['name'] = self.share_codes[share_index]['name']
 
-            item['announce_type'] = ''
-
+            item['news_title'] = unit['title']
             desc_text = unit['description']
             desc_list = re.split(u'(<a.+/a>)', desc_text)
             if len(desc_list) >= 2:
-                item['announce_title'] = desc_list[0]
+                item['news_text'] = desc_list[0]
 
                 desc_obj = etree.HTML(desc_list[1])
                 hrefs = desc_obj.xpath(u'//a')
                 for href in hrefs:
-                    item['announce_url'] = href.attrib['href']
+                    item['news_url'] = href.attrib['href']
 
             else:
-                item['announce_title'] = desc_text
-                item['announce_url'] = ''
+                item['news_text'] = desc_text
+                item['news_url'] = ''
 
             # 转换为北京时间
             create_utc = string.atoi(str(unit['created_at']))
-            item['announce_date'] = self.utc_to_bj(create_utc, ty='ms', fm='%Y-%m-%d %H:%M')
+            item['date'] = self.utc_to_bj(create_utc, ty='ms', fm='%Y-%m-%d %H:%M')
 
             if min_create_utc > create_utc:
                 min_create_utc = create_utc
@@ -292,9 +291,9 @@ class CompanyNewSpider(Spider):
             if max_create_utc < create_utc:
                 max_create_utc = create_utc
 
-            # 获取公告的ID
-            announce_id = string.atoi(str(unit['id']))
-            item['announce_id'] = announce_id
+            # 获取新闻的ID
+            news_id = string.atoi(str(unit['id']))
+            item['news_id'] = news_id
 
             item_list.append(item)
 
@@ -352,8 +351,8 @@ class CompanyNewSpider(Spider):
 
         # 只爬取最新数据模式
         else:
-            if code in self.last_announce and self.last_announce[code]:
-                last_create = self.last_announce[code]['announce_utc']
+            if code in self.last_news and self.last_news[code]:
+                last_create = self.last_news[code]['news_utc']
             else:
                 last_create = dead_create
 

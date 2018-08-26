@@ -243,6 +243,8 @@ class CompanyNewItem(Item):
     name = Field()
     # 新闻标题
     news_title = Field()
+    # 新闻内容
+    news_text = Field()
     # 新闻地址
     news_url = Field()
     # 发布日期
