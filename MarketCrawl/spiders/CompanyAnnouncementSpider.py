@@ -37,7 +37,7 @@ class CompanyAnnouncementSpider(Spider):
     start_urls = ['https://xueqiu.com/', 'https://xueqiu.com/statuses/stock_timeline.json']
     custom_settings = {
         'DOWNLOAD_DELAY': 0.3,
-        #'LOG_FILE': './log/{}'.format(__name__)
+        'LOG_FILE': './log/{}'.format(__name__)
     }
 
     # 定义如下的http返回码是爬取过程中正常的，可预期的

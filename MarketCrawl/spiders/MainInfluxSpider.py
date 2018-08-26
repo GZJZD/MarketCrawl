@@ -34,7 +34,7 @@ class MainInfluxSpider(Spider):
     start_urls = ['http://ff.eastmoney.com//EM_CapitalFlowInterface/api/js']
     custom_settings = {
         'DOWNLOAD_DELAY': 0.1,
-        #'LOG_FILE': './log/{}'.format(__name__)
+        'LOG_FILE': './log/{}'.format(__name__)
     }
 
     db_connect = None
