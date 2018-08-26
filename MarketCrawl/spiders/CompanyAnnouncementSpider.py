@@ -36,9 +36,7 @@ class CompanyAnnouncementSpider(Spider):
     allowed_domains = ['xueqiu.com', ]
     start_urls = ['https://xueqiu.com/', 'https://xueqiu.com/statuses/stock_timeline.json']
     custom_settings = {
-        'DOWNLOAD_DELAY': 0.1,
-        'RETRY_TIMES': 3,
-        'DOWNLOAD_TIMEOUT': 10,
+        'DOWNLOAD_DELAY': 0.3,
         #'LOG_FILE': './log/{}'.format(__name__)
     }
 
@@ -52,7 +50,7 @@ class CompanyAnnouncementSpider(Spider):
         # 周期定义为3个月
         self.period = (3600 * 24 * 30) * 3
         # 开始爬取的utc时间
-        self.cur_utc = self.current_utc_time()
+        self.cur_utc = self.current_utc_time(ty='ms')
 
         self.share_codes = []
         self.last_announce = {}
@@ -261,7 +259,7 @@ class CompanyAnnouncementSpider(Spider):
         item_list = []
         page_data = json_obj['list']
 
-        min_create_utc = sys.maxint
+        min_create_utc = sys.maxint * 10000
         max_create_utc = 0
         for unit in page_data:
             item = CompanyAnnouncementItem()
@@ -343,6 +341,36 @@ class CompanyAnnouncementSpider(Spider):
         )
         return request
 
+    def is_exceed_bound(self, min_create, max_create, last_create=None):
+        dead_create = self.cur_utc - self.period * 1000
+        # 按给定周期爬取模式
+        if last_create is None:
+            if min_create > dead_create:
+                return False  # 最小时间都比截止时间大，表示还需要继续爬取下一个页面
+            else:
+                return True  # 最小时间已经比截止时间小，表示已经爬取完区间内的数据，不需要爬取下一页面
+
+        # 只爬取最新数据模式
+        else:
+            if self.cur_utc <= last_create:
+                return True  # 启动时间与最后更新时间相等，则每只股票取第一页数据即可
+            elif min_create > last_create:
+                return False  # 最小时间都比最近更新时间大，表示还需要继续爬取下一个页面
+            else:
+                return True  # 最小时间已经比最近更新时间小，表示已经爬取完更新的数据，不需要爬取下一页面
+
+    def is_page_done(self, page_index, page_total):
+        if page_index < page_total:
+            return False
+        else:
+            return True
+
+    def is_share_done(self, share_index, share_total):
+        if share_index < share_total - 1:
+            return False
+        else:
+            return True
+
     def parse_page_data(self, response):
         assert isinstance(response, Response)
         share_total = response.meta['share_total']
@@ -363,7 +391,6 @@ class CompanyAnnouncementSpider(Spider):
             page_size = json_obj['count']
 
             min_create = max_create = 0
-
             self.logger.info('share_total=%s, share_index=%s, page_total=%s, page_index=%s, page_size=%s',
                              share_total, share_index, page_total, page_index, page_size)
 
@@ -380,37 +407,48 @@ class CompanyAnnouncementSpider(Spider):
 
             # 如果是全量爬取
             if self.mode is not None and self.mode.upper() == 'ALL':
-                if page_total == page_index and share_index < share_total:
-                    self.logger.info('share_total=%s, share_index=%s, share_code=%s, share_name=%s is finished',
-                                     share_total, share_index, cur_code, cur_name)
-                    yield self.post_next_share(share_index, share_total, page_size, response)
-
-                elif page_index < page_total and share_index < share_total:
-                    yield self.post_next_page(share_index, share_total, page_index, page_size, response)
-
+                if not self.is_share_done(share_index, share_total):
+                    if not self.is_page_done(page_index, page_total):
+                        yield self.post_next_page(share_index, share_total, page_index, page_size, response)
+                    else:
+                        self.logger.info('share_total=%s, share_index=%s, share_code=%s, share_name=%s is finished',
+                                         share_total, share_index, cur_code, cur_name)
+                        yield self.post_next_share(share_index, share_total, page_size, response)
                 else:
                     self.logger.info('{} is finished'.format(self.name))
 
             # 如果是爬取周期内的数据
             elif self.mode is not None and self.mode.upper() == 'PERIOD':
-                pass
+                if not self.is_share_done(share_index, share_total):
+                    if not self.is_page_done(page_index, page_total):
+                        if not self.is_exceed_bound(min_create, max_create):
+                            yield self.post_next_page(share_index, share_total, page_index, page_size, response)
+                        else:
+                            self.logger.info('share_total=%s, share_index=%s, share_code=%s, share_name=%s is finished',
+                                             share_total, share_index, cur_code, cur_name)
+                            yield self.post_next_share(share_index, share_total, page_size, response)
+                    else:
+                        self.logger.info('share_total=%s, share_index=%s, share_code=%s, share_name=%s is finished',
+                                         share_total, share_index, cur_code, cur_name)
+                        yield self.post_next_share(share_index, share_total, page_size, response)
+                else:
+                    self.logger.info('{} is finished'.format(self.name))
 
             # 如果是增量爬取
             elif self.mode is not None and self.mode.upper() == 'NEWEST':
-                pass
+                if not self.is_share_done(share_index, share_total):
+                    if not self.is_page_done(page_index, page_total):
+                        if not self.is_exceed_bound(min_create, max_create, self.last_announce[cur_code]['announce_utc']):
+                            yield self.post_next_page(share_index, share_total, page_index, page_size, response)
+                        else:
+                            self.logger.info('share_total=%s, share_index=%s, share_code=%s, share_name=%s is finished',
+                                             share_total, share_index, cur_code, cur_name)
+                            yield self.post_next_share(share_index, share_total, page_size, response)
+                    else:
+                        self.logger.info('share_total=%s, share_index=%s, share_code=%s, share_name=%s is finished',
+                                         share_total, share_index, cur_code, cur_name)
+                        yield self.post_next_share(share_index, share_total, page_size, response)
+                else:
+                    self.logger.info('{} is finished'.format(self.name))
             else:
                 raise RuntimeError('param mode is error')
-
-            if page_total == page_index and share_index < share_total:
-                self.logger.info('share_total=%s, share_index=%s, share_code=%s, share_name=%s is finished',
-                            share_total, share_index, cur_code, cur_name)
-                yield self.post_next_share(share_index, share_total, page_size, response)
-
-            elif self.partial_update and min_announce_id < cur_last_announce_id:
-                self.logger.info('share_total=%s, share_index=%s, share_code=%s, share_name=%s is partial update finished',
-                            share_total, share_index, cur_code, cur_name)
-
-            elif page_index < page_total and share_index < share_total:
-                yield self.post_next_page(share_index, share_total, page_index, page_size, response)
-            else:
-                self.logger.info('{} is finished'.format(self.name))

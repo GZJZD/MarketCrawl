@@ -33,10 +33,8 @@ class MainInfluxSpider(Spider):
     allowed_domains = ['ff.eastmoney.com', ]
     start_urls = ['http://ff.eastmoney.com//EM_CapitalFlowInterface/api/js']
     custom_settings = {
-        'DOWNLOAD_DELAY': 0.25,
-        'RETRY_TIMES': 5,
-        'DOWNLOAD_TIMEOUT': 60,
-        'LOG_FILE': './log/{}'.format(__name__)
+        'DOWNLOAD_DELAY': 0.1,
+        #'LOG_FILE': './log/{}'.format(__name__)
     }
 
     db_connect = None
@@ -147,16 +145,16 @@ class MainInfluxSpider(Spider):
 
         yield Request(
             url=begin_url,
-            meta={'page_index': begin_index, 'page_total': len(self.share_codes)}
+            meta={'share_index': begin_index, 'share_total': len(self.share_codes)}
         )
 
     def parse(self, response):
         assert isinstance(response, Response)
 
-        page_total = response.meta['page_total']
-        page_index = response.meta['page_index']
-        self.logger.info('page_total=%s, page_index=%s, share_code=%s, share_name=%s',page_total, page_index,
-                    self.share_codes[page_index]['code'], self.share_codes[page_index]['name'])
+        share_total = response.meta['share_total']
+        share_index = response.meta['share_index']
+        self.logger.info('share_total=%s, share_index=%s, share_code=%s, share_name=%s',share_total, share_index,
+                    self.share_codes[share_index]['code'], self.share_codes[share_index]['name'])
 
         # 去除头部的'=', 得到json格式的文本
         body_list = re.split('^[^=]*(=+)', str(response.body))
@@ -172,8 +170,8 @@ class MainInfluxSpider(Spider):
                 unit = unit_text.split(u',')
 
                 item = MainInfluxItem()
-                item['symbol'] = self.share_codes[page_index]['code']
-                item['name'] = self.share_codes[page_index]['name']
+                item['symbol'] = self.share_codes[share_index]['code']
+                item['name'] = self.share_codes[share_index]['name']
                 item['last_update_time'] = unit[0]
                 item['main_influx_price'] = unit[1]
                 item['main_influx_ratio'] = unit[2]
@@ -191,15 +189,27 @@ class MainInfluxSpider(Spider):
             self.logger.info('page_data data is empty')
 
         # 更新下一个待爬取的url后返回
-        if page_index < page_total:
-            # 更新下一支股票由code+type组成的key
-            page_index += 1
-            next_share_key = self.share_codes[page_index]['code'] + self.share_codes[page_index]['type']
-            next_url = re.sub('id=\w+', 'id={}'.format(next_share_key), response.url)
-            yield Request(
-                url=next_url,
-                meta={'page_index': page_index, 'page_total': page_total}
-            )
-            self.logger.info('next_url=%s', next_url)
+        if not self.is_share_done(share_index, share_total):
+            yield self.post_next_share(share_index, share_total, response)
         else:
             self.logger.info('{} is finished'.format(self.name))
+
+    def post_next_share(self, share_index, share_total, response):
+        share_index += 1
+
+        # 更换code
+        next_share_key = self.share_codes[share_index]['code'] + self.share_codes[share_index]['type']
+        next_url = re.sub('id=\w+', 'id={}'.format(next_share_key), response.url)
+        self.logger.info('next_url=%s', next_url)
+
+        request = Request(
+            url=next_url,
+            meta={'share_index': share_index, 'share_total': share_total}
+        )
+        return request
+
+    def is_share_done(self, share_index, share_total):
+        if share_index < share_total - 1:
+            return False
+        else:
+            return True

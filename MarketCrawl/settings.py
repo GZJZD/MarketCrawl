@@ -34,7 +34,7 @@ LOG_FORMAT = '%(asctime)s\tFile \"%(filename)s\",line %(lineno)s\t%(levelname)s:
 
 # 全局的下载延时相关参数配置
 DOWNLOAD_DELAY = 1
-DOWNLOAD_TIMEOUT = 60
+DOWNLOAD_TIMEOUT = 10
 
 # 重试相关参数配置
 RETRY_TIMES = 3

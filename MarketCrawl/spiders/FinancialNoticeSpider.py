@@ -22,7 +22,6 @@ from pymysql.connections import Connection
 from pymysql.cursors import Cursor
 import pymysql
 import time
-import demjson
 import re
 import random
 import string
@@ -32,9 +31,7 @@ class FinancialNoticeSpider(Spider):
     allowed_domains = ['data.eastmoney.com', ]
     start_urls = ['http://data.eastmoney.com/bbsj/']
     custom_settings = {
-        'DOWNLOAD_DELAY': 0.25,
-        'RETRY_TIMES': 5,
-        'DOWNLOAD_TIMEOUT': 60,
+        'DOWNLOAD_DELAY': 0.1,
         'LOG_FILE': './log/{}'.format(__name__)
     }
 
@@ -110,9 +107,16 @@ class FinancialNoticeSpider(Spider):
         return random_str
 
     @staticmethod
-    def current_milli_time():
-        milli_time = lambda: int(round(time.time() * 1000))
-        return milli_time()
+    def current_utc_time(ty='s'):
+        milli_time = lambda: int(round(time.time()))
+
+        if ty is not None and ty.upper() == 'S':
+            mt = milli_time()
+        elif ty is not None and ty.upper() == 'MS':
+            mt = milli_time() * 1000
+        else:
+            mt = milli_time()
+        return mt
 
     def start_requests(self):
         if len(self.share_codes) == 0:
@@ -128,15 +132,15 @@ class FinancialNoticeSpider(Spider):
 
         yield Request(
             url=begin_url,
-            meta={'page_index': begin_index, 'page_total': len(self.share_codes)}
+            meta={'share_index': begin_index, 'share_total': len(self.share_codes)}
         )
 
     def parse(self, response):
         assert isinstance(response, Response)
-        page_total = response.meta['page_total']
-        page_index = response.meta['page_index']
-        self.logger.info('page_total=%s, page_index=%s, share_code=%s, share_name=%s',page_total, page_index,
-                    self.share_codes[page_index]['code'], self.share_codes[page_index]['name'])
+        share_total = response.meta['share_total']
+        share_index = response.meta['share_index']
+        self.logger.info('share_total=%s, share_index=%s, share_code=%s, share_name=%s', share_total, share_index,
+                    self.share_codes[share_index]['code'], self.share_codes[share_index]['name'])
 
         page = Selector(response)
 
@@ -150,8 +154,8 @@ class FinancialNoticeSpider(Spider):
 
         for i in range(len(table_body)):
             item = FinancialNoticeItem()
-            item['symbol'] = self.share_codes[page_index]['code']
-            item['name'] = self.share_codes[page_index]['name']
+            item['symbol'] = self.share_codes[share_index]['code']
+            item['name'] = self.share_codes[share_index]['name']
 
             # 业绩变动内容
             path = '//*[@id="Table2"]/tbody/tr[{}]/td[2]/span/text()'.format(i+1)
@@ -198,15 +202,26 @@ class FinancialNoticeSpider(Spider):
                 yield item
 
         # 更新下一个待爬取的url后返回
-        if page_index < page_total:
-            # 更新下一支股票的code
-            page_index += 1
-            next_url = re.sub('\d+', '{}'.format(self.share_codes[page_index]['code']), response.url)
-
-            yield Request(
-                url=next_url,
-                meta={'page_index': page_index, 'page_total': page_total}
-            )
-            self.logger.info('next_url=%s', next_url)
+        if not self.is_share_done(share_index, share_total):
+            yield self.post_next_share(share_index, share_total, response)
         else:
             self.logger.info('{} is finished'.format(self.name))
+
+    def post_next_share(self, share_index, share_total, response):
+        share_index += 1
+
+        # 更换code
+        next_url = re.sub('\d+', '{}'.format(self.share_codes[share_index]['code']), response.url)
+        self.logger.info('next_url=%s', next_url)
+
+        request = Request(
+            url=next_url,
+            meta={'share_index': share_index, 'share_total':share_total}
+        )
+        return request
+
+    def is_share_done(self, share_index, share_total):
+        if share_index < share_total - 1:
+            return False
+        else:
+            return True

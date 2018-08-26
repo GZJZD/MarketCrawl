@@ -46,15 +46,32 @@ R)
 ;;
 
 A)
-  spider_start CompanyAnnouncementSpider
+ {
+   if [ "$2" != "newest" ] ; then
+     spider_start 'CompanyAnnouncementSpider -a mode=newest'
+   elif [ "$2" != "period" ] ; then
+      spider_start 'CompanyAnnouncementSpider -a mode=period'
+   else
+      spider_start 'CompanyAnnouncementSpider'
+   fi
+ }
 ;;
 
 N)
+ {
+   if [ "$2" != "newest" ] ; then
+     spider_start 'CompanyNewSpider -a mode=newest'
+   elif [ "$2" != "period" ] ; then
+      spider_start 'CompanyNewSpider -a mode=period'
+   else
+      spider_start 'CompanyNewSpider'
+   fi
+ }
   spider_start CompanyNewSpider
 ;;
 
 *)
-  echo "Usage: ./start.sh {G |M |F |H |B |P |R |A |C } {all|newest}"
+  echo "Usage: ./start.sh {G |M |F |H |B |P |R |A |C } {all| period| newest}"
  exit 1
 ;;
 esac
