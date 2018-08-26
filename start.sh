@@ -47,9 +47,9 @@ R)
 
 A)
  {
-   if [ "$2" != "newest" ] ; then
+   if [ "$2" == "newest" ] ; then
      spider_start 'CompanyAnnouncementSpider -a mode=newest'
-   elif [ "$2" != "period" ] ; then
+   elif [ "$2" == "period" ] ; then
       spider_start 'CompanyAnnouncementSpider -a mode=period'
    else
       spider_start 'CompanyAnnouncementSpider'
@@ -59,9 +59,9 @@ A)
 
 N)
  {
-   if [ "$2" != "newest" ] ; then
+   if [ "$2" == "newest" ] ; then
      spider_start 'CompanyNewSpider -a mode=newest'
-   elif [ "$2" != "period" ] ; then
+   elif [ "$2" == "period" ] ; then
       spider_start 'CompanyNewSpider -a mode=period'
    else
       spider_start 'CompanyNewSpider'
