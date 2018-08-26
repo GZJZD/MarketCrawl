@@ -3,7 +3,7 @@ from scrapy import cmdline
 import sys
 
 #name = 'GridListSpider'
-name = 'MainInfluxSpider'
+#name = 'MainInfluxSpider'
 #name = 'FinancialNoticeSpider'
 #name = 'ShareHolderSpider'
 #name = 'ShareBuybackSpider'
@@ -11,7 +11,7 @@ name = 'MainInfluxSpider'
 #name = 'RestrictedSpider'
 #name = 'CompanyAnnouncementSpider'
 #name = 'CompanyAnnouncementSpider -a mode=period'
-#name = 'CompanyAnnouncementSpider -a mode=newest'
+name = 'CompanyAnnouncementSpider -a mode=newest'
 #name = 'CompanyNewSpider'
 #name = 'CompanyNewSpider -a mode=period'
 #name = 'CompanyNewSpider -a mode=newest'

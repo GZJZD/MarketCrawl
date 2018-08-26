@@ -341,10 +341,10 @@ class CompanyNewSpider(Spider):
         )
         return request
 
-    def is_exceed_bound(self, min_create, max_create, last_create=None):
+    def is_exceed_bound(self, min_create, max_create, code=None):
         dead_create = self.cur_utc - self.period * 1000
         # 按给定周期爬取模式
-        if last_create is None:
+        if code is None:
             if min_create > dead_create:
                 return False  # 最小时间都比截止时间大，表示还需要继续爬取下一个页面
             else:
@@ -352,6 +352,11 @@ class CompanyNewSpider(Spider):
 
         # 只爬取最新数据模式
         else:
+            if code in self.last_announce and self.last_announce[code]:
+                last_create = self.last_announce[code]['announce_utc']
+            else:
+                last_create = dead_create
+
             if self.cur_utc <= last_create:
                 return True  # 启动时间与最后更新时间相等，则每只股票取第一页数据即可
             elif min_create > last_create:
@@ -438,7 +443,7 @@ class CompanyNewSpider(Spider):
             elif self.mode is not None and self.mode.upper() == 'NEWEST':
                 if not self.is_share_done(share_index, share_total):
                     if not self.is_page_done(page_index, page_total):
-                        if not self.is_exceed_bound(min_create, max_create, self.last_announce[cur_code]['announce_utc']):
+                        if not self.is_exceed_bound(min_create, max_create, cur_code):
                             yield self.post_next_page(share_index, share_total, page_index, page_size, response)
                         else:
                             self.logger.info('share_total=%s, share_index=%s, share_code=%s, share_name=%s is finished',
