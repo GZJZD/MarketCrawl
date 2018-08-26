@@ -21,7 +21,7 @@ class MarketcrawlUserAgentMiddleware(object):
 
     def __init__(self):
         super(MarketcrawlUserAgentMiddleware, self).__init__()
-        self.ua = UserAgent()
+        self.ua = UserAgent(use_cache_server=False)
 
     def process_request(self, request, spider):
         assert isinstance(spider, Spider)
