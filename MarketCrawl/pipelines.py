@@ -100,12 +100,15 @@ class MarketCrawlSQLPipeline(object):
         volumn, price, max_price, min_pirce, open_price, close_price, change_volumn, quantity_ratio, 
         pe_ratio, pb_ratio, date) 
 	    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) 
-	    ON DUPLICATE KEY UPDATE shares_code=%s, date=%s"""
+	    ON DUPLICATE KEY UPDATE latest_price=%s, rise_fall_ratio=%s, rise_fall_price=%s, 
+	    volumn=%s, price=%s, max_price=%s, min_pirce=%s, open_price=%s, close_price=%s, 
+	    change_volumn=%s, quantity_ratio=%s, pe_ratio=%s, pb_ratio=%s"""
 
-        #从ITEM中获取SQL的数据项并定义为tupe类型
+        # 从ITEM中获取SQL的数据项并定义为tupe类型
         assert isinstance(item, BasicIndicatorItem)
 
         params = []
+        # VALUES list
         params.append(item['symbol'])
         params.append(item['name'])
         params.append(item['type'])
@@ -126,8 +129,20 @@ class MarketCrawlSQLPipeline(object):
         data_and_hours = item['last_update_time'][0].split(u' ')
         params.append(data_and_hours[0])
 
-        params.append(item['symbol'])
-        params.append(data_and_hours[0])
+        # UPDATE list
+        params.append(item['last_price'])
+        params.append(item['change_rate'])
+        params.append(item['change_amount'])
+        params.append(item['turnover_volume'])
+        params.append(item['turnover_amount'])
+        params.append(item['highest'])
+        params.append(item['lowest'])
+        params.append(item['price_open'])
+        params.append(item['prev_close'])
+        params.append(item['turnover_hand'])
+        params.append(item['quantity_ratio'])
+        params.append(item['pe_ratio'])
+        params.append(item['pb_ratio'])
 
         cursor.execute(sql, params)
 
@@ -137,13 +152,16 @@ class MarketCrawlSQLPipeline(object):
                 shares_code, shares_name, main_influx_price, main_influx_ratio, huge_influx_price, huge_influx_ratio, 
                 large_influx_price, large_influx_ratio, middle_influx_price, middle_influx_ratio, 
                 small_influx_price, small_influx_ratio, date) 
-        	    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        	    ON DUPLICATE KEY UPDATE shares_code=%s, date=%s"""
+        	    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) 
+        	    ON DUPLICATE KEY UPDATE main_influx_price=%s, main_influx_ratio=%s, huge_influx_price=%s, 
+        	    huge_influx_ratio=%s, large_influx_price=%s, large_influx_ratio=%s, middle_influx_price=%s, 
+        	    middle_influx_ratio=%s, small_influx_price=%s, small_influx_ratio=%s"""
 
         #从ITEM中获取SQL的数据项并定义为tupe类型
         assert isinstance(item, MainInfluxItem)
 
         params = []
+        # VALUES list
         params.append(item['symbol'])
         params.append(item['name'])
         params.append(item['main_influx_price'])
@@ -160,8 +178,17 @@ class MarketCrawlSQLPipeline(object):
         data_and_hours = item['last_update_time'].split(u' ')
         params.append(data_and_hours[0])
 
-        params.append(item['symbol'])
-        params.append(data_and_hours[0])
+        # UPDATE list
+        params.append(item['main_influx_price'])
+        params.append(item['main_influx_ratio'])
+        params.append(item['huge_influx_price'])
+        params.append(item['huge_influx_ratio'])
+        params.append(item['large_influx_price'])
+        params.append(item['large_influx_ratio'])
+        params.append(item['middle_influx_price'])
+        params.append(item['middle_influx_ratio'])
+        params.append(item['small_influx_price'])
+        params.append(item['small_influx_ratio'])
 
         cursor.execute(sql, params)
 
@@ -172,12 +199,15 @@ class MarketCrawlSQLPipeline(object):
                 performance_change_ratio_left, performance_change_ratio_right, performance_change_reason, preview_type, 
                 previous_year_profit, announcement_date) 
         	    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        	    ON DUPLICATE KEY UPDATE shares_code=%s, announcement_date=%s"""
+        	    ON DUPLICATE KEY UPDATE performance_change=%s, expected_net_profit_left=%s, expected_net_profit_right = %s
+        	    performance_change_ratio_left=%s, performance_change_ratio_right=%s, performance_change_reason=%s, 
+        	    preview_type=%s, previous_year_profit=%s"""
 
         #从ITEM中获取SQL的数据项并定义为tupe类型
         assert isinstance(item, FinancialNoticeItem)
 
         params = []
+        # VALUES list
         params.append(item['symbol'])
         params.append(item['name'])
         params.append(item['forecast_content'])
@@ -190,8 +220,15 @@ class MarketCrawlSQLPipeline(object):
         params.append(item['previous_year_profit'])
         params.append(item['announcement_date'])
 
-        params.append(item['symbol'])
-        params.append(item['announcement_date'])
+        # UPDATE list
+        params.append(item['forecast_content'])
+        params.append(item['forecast_left'])
+        params.append(item['forecast_right'])
+        params.append(item['increase_left'])
+        params.append(item['increase_right'])
+        params.append(item['change_reason'])
+        params.append(item['preview_type'])
+        params.append(item['previous_year_profit'])
 
         cursor.execute(sql, params)
 
@@ -202,12 +239,15 @@ class MarketCrawlSQLPipeline(object):
                 change_share_ratio, total_hold, total_equity_ratio, total_share, total_share_ratio, 
                 begin_date, end_date, announcement_date) 
         	    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) 
-        	    ON DUPLICATE KEY UPDATE shares_code=%s, announcement_date=%s"""
+        	    ON DUPLICATE KEY UPDATE shareholders_name=%s, change_type=%s, change_share=%s, change_equity_ratio=%s, 
+        	    change_share_ratio=%s, total_hold=%s, total_equity_ratio=%s, total_share=%s, total_share_ratio=%s,
+        	    begin_date=%s, end_date=%s"""
 
         #从ITEM中获取SQL的数据项并定义为tupe类型
         assert isinstance(item, ShareHolderItem)
 
         params = []
+        # VALUES list
         params.append(item['symbol'])
         params.append(item['name'])
         params.append(item['shareholders_name'])
@@ -223,24 +263,39 @@ class MarketCrawlSQLPipeline(object):
         params.append(item['end_date'])
         params.append(item['announcement_date'])
 
-        params.append(item['symbol'])
-        params.append(item['announcement_date'])
+        # UPDATE list
+        params.append(item['shareholders_name'])
+        params.append(item['change_type'])
+        params.append(item['change_share'])
+        params.append(item['change_equity_ratio'])
+        params.append(item['change_share_ratio'])
+        params.append(item['total_hold'])
+        params.append(item['total_equity_ratio'])
+        params.append(item['total_share'])
+        params.append(item['total_share_ratio'])
+        params.append(item['begin_date'])
+        params.append(item['end_date'])
 
         cursor.execute(sql, params)
 
     def handle_insert_share_buyback(self, cursor, item):
         # 待执行的SQL语句
         sql = """INSERT INTO crawler_share_buyback (
-                shares_code, shares_name, buyback_price_range_left, buyback_price_range_right, close_price, buyback_volumn_range_left, 
-                buyback_volumn_range_right, share_ratio_left, share_ratio_right, equity_ratio_left, equity_ratio_right, 
-                buyback_amount_range_left, buyback_amount_range_right, begin_date, impl_progress, announcement_date) 
+                shares_code, shares_name, buyback_price_range_left, buyback_price_range_right, close_price, 
+                buyback_volumn_range_left, buyback_volumn_range_right, share_ratio_left, share_ratio_right, 
+                equity_ratio_left, equity_ratio_right, buyback_amount_range_left, buyback_amount_range_right, 
+                begin_date, impl_progress, announcement_date) 
         	    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) 
-        	    ON DUPLICATE KEY UPDATE shares_code=%s, announcement_date=%s"""
+        	    ON DUPLICATE KEY UPDATE buyback_price_range_left=%s, buyback_price_range_right=%s, close_price=%s, 
+        	    buyback_volumn_range_left=%s, buyback_volumn_range_right=%s, share_ratio_left=%s, share_ratio_right=%s, 
+        	    equity_ratio_left=%s, equity_ratio_right=%s, buyback_amount_range_left=%s, 
+        	    buyback_amount_range_right=%s, begin_date=%s, impl_progress=%s"""
 
         #从ITEM中获取SQL的数据项并定义为tupe类型
         assert isinstance(item, ShareBuybackItem)
 
         params = []
+        # VALUES list
         params.append(item['symbol'])
         params.append(item['name'])
         params.append(item['buyback_price_range_left'])
@@ -282,8 +337,20 @@ class MarketCrawlSQLPipeline(object):
         date_and_hours = item['announcement_date'].split(u' ')
         params.append(date_and_hours[0])
 
-        params.append(item['symbol'])
-        params.append(date_and_hours[0])
+        # UPDATE list
+        params.append(item['buyback_price_range_left'])
+        params.append(item['buyback_price_range_right'])
+        params.append(item['close_price'])
+        params.append(item['buyback_volumn_range_left'])
+        params.append(item['buyback_volumn_range_right'])
+        params.append(item['share_ratio_left'])
+        params.append(item['share_ratio_right'])
+        params.append(item['equity_ratio_left'])
+        params.append(item['equity_ratio_right'])
+        params.append(item['buyback_amount_range_left'])
+        params.append(item['buyback_amount_range_right'])
+        params.append(begin_date_hours[0])
+        params.append(impl_progress_text)
 
         cursor.execute(sql, params)
 
@@ -294,12 +361,15 @@ class MarketCrawlSQLPipeline(object):
                 equity_datio, close_position_range_left, close_position_range_right, warning_position_range_left, 
                 warning_position_range_right, update_date) 
         	    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) 
-        	    ON DUPLICATE KEY UPDATE shares_code=%s, update_date=%s"""
+        	    ON DUPLICATE KEY UPDATE shareholders_name=%s, pledge_number=%s, pledge_volumn=%s, pledge_price=%s,
+        	    share_ratio=%s, equity_datio=%s, close_position_range_left=%s, close_position_range_right=%s, 
+        	    warning_position_range_left=%s, warning_position_range_right=%s"""
 
         #从ITEM中获取SQL的数据项并定义为tupe类型
         assert isinstance(item, SharePledgeItem)
 
         params = []
+        # VALUES list
         params.append(item['symbol'])
         params.append(item['name'])
         params.append(item['shareholders_name'])
@@ -317,8 +387,17 @@ class MarketCrawlSQLPipeline(object):
         date_and_hours = item['update_date'].split(u' ')
         params.append(date_and_hours[0])
 
-        params.append(item['symbol'])
-        params.append(date_and_hours[0])
+        # UPDATE list
+        params.append(item['shareholders_name'])
+        params.append(item['pledge_number'])
+        params.append(item['pledge_volumn'])
+        params.append(item['pledge_price'])
+        params.append(item['share_ratio'])
+        params.append(item['equity_datio'])
+        params.append(item['close_position_range_left'])
+        params.append(item['close_position_range_right'])
+        params.append(item['warning_position_range_left'])
+        params.append(item['warning_position_range_right'])
 
         cursor.execute(sql, params)
 
@@ -328,12 +407,15 @@ class MarketCrawlSQLPipeline(object):
                 shares_code, shares_name, shareholders_num, share_num, real_share_num, non_share_num, real_share_price, 
                 equity_ratio, share_ratio, close_price, share_type, before_range, after_range, circulation_date) 
         	    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) 
-        	    ON DUPLICATE KEY UPDATE shares_code=%s, circulation_date=%s"""
+        	    ON DUPLICATE KEY UPDATE shareholders_num=%s, share_num=%s, real_share_num=%s, non_share_num=%s, 
+        	    real_share_price=%s, equity_ratio=%s, share_ratio=%s, close_price=%s, share_type=%s, 
+        	    before_range=%s, after_range=%s"""
 
         #从ITEM中获取SQL的数据项并定义为tupe类型
         assert isinstance(item, RestrictedItem)
 
         params = []
+        # VALUES list
         params.append(item['symbol'])
         params.append(item['name'])
         params.append(item['shareholders_num'])
@@ -352,8 +434,18 @@ class MarketCrawlSQLPipeline(object):
         date_and_hours = item['circulation_date'].split(u'T')
         params.append(date_and_hours[0])
 
-        params.append(item['symbol'])
-        params.append(date_and_hours[0])
+        # UPDATE list
+        params.append(item['shareholders_num'])
+        params.append(item['share_num'])
+        params.append(item['real_share_num'])
+        params.append(item['non_share_num'])
+        params.append(item['real_share_price'])
+        params.append(item['equity_ratio'])
+        params.append(item['share_ratio'])
+        params.append(item['close_price'])
+        params.append(item['share_type'])
+        params.append(item['before_range'])
+        params.append(item['after_range'])
 
         cursor.execute(sql, params)
 
@@ -362,23 +454,26 @@ class MarketCrawlSQLPipeline(object):
         sql = """INSERT INTO crawler_company_announcement (
                 shares_code, shares_name, announce_title, announce_url, announce_type, announce_date, announce_id) 
         	    VALUES (%s,%s,%s,%s,%s,%s,%s) 
-        	    ON DUPLICATE KEY UPDATE shares_code=%s, announce_id=%s"""
+        	    ON DUPLICATE KEY UPDATE announce_title=%s, announce_url=%s, announce_type=%s, announce_date=%s"""
 
         #从ITEM中获取SQL的数据项并定义为tupe类型
         assert isinstance(item, CompanyAnnouncementItem)
 
         params = []
+        # VALUES list
         params.append(item['symbol'])
         params.append(item['name'])
         params.append(item['announce_title'])
         params.append(item['announce_url'])
         params.append(item['announce_type'])
-
         params.append(item['announce_date'])
         params.append(item['announce_id'])
 
-        params.append(item['symbol'])
-        params.append(item['announce_id'])
+        # UPDATE list
+        params.append(item['announce_title'])
+        params.append(item['announce_url'])
+        params.append(item['announce_type'])
+        params.append(item['announce_date'])
 
         cursor.execute(sql, params)
 
@@ -387,22 +482,24 @@ class MarketCrawlSQLPipeline(object):
         sql = """INSERT INTO crawler_company_news (
                 shares_code, shares_name, news_title, news_url, date, news_id) 
         	    VALUES (%s,%s,%s,%s,%s,%s) 
-        	    ON DUPLICATE KEY UPDATE shares_code=%s, news_id=%s"""
+        	    ON DUPLICATE KEY UPDATE news_title=%s, news_url=%s, date=%s"""
 
         #从ITEM中获取SQL的数据项并定义为tupe类型
         assert isinstance(item, CompanyNewItem)
 
         params = []
+        # VALUES list
         params.append(item['symbol'])
         params.append(item['name'])
         params.append(item['news_title'])
         params.append(item['news_url'])
-
         params.append(item['date'])
         params.append(item['news_id'])
 
-        params.append(item['symbol'])
-        params.append(item['news_id'])
+        # UPDATE list
+        params.append(item['news_title'])
+        params.append(item['news_url'])
+        params.append(item['date'])
 
         cursor.execute(sql, params)
 
